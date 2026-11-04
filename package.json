@@ -67,6 +67,8 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "YouTube Google Refuses To Make",
+      "uninstallDisplayName": "YouTube Google Refuses To Make",
+      "deleteAppDataOnUninstall": true,
       "artifactName": "YouTube-Google-Refuses-To-Make-Setup-${version}-${arch}.${ext}"
     },
     "portable": {

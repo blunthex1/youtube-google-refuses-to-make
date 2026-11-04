@@ -44,6 +44,7 @@ The app isn't code-signed yet, so Windows SmartScreen will warn on first launch:
 
 - Links to other sites open in your normal browser. YouTube and Google sign-in stay in the app.
 - You can launch it with a URL (`YGRTM.exe https://youtu.be/...`) to open that video.
+- To uninstall, use Windows **Settings → Apps → Installed apps** (or the Start menu's uninstall entry). The installer version also deletes the app's saved settings and sign-in. The portable `.exe` has no uninstaller; just delete it and `%APPDATA%\YouTube Google Refuses To Make`.
 - Settings are stored in `%APPDATA%\YouTube Google Refuses To Make\config.json`.
 
 **Signing in:** Google sometimes blocks sign-in from "embedded" browsers. The app shows Google's sign-in pages a standard Firefox user-agent, the usual workaround. If Google still refuses, please open an issue.
