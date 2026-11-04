@@ -17,7 +17,7 @@ const storage = {
 try {
   if (ipcRenderer.sendSync('aif:ad-prune')) contextBridge.executeInMainWorld({ func: installAdPrune });
 } catch (err) {
-  console.error('MSM: ad pruning not installed', err);
+  console.error('YGRTM: ad pruning not installed', err);
 }
 
 webFrame.insertCSS(css);

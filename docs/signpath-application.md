@@ -1,10 +1,10 @@
 # SignPath Foundation application: answers to paste
 
-**Project name:** MSM for YouTube
-**Repository:** https://github.com/blunthex1/msm
+**Project name:** YouTube Google Refuses To Make
+**Repository:** https://github.com/blunthex1/youtube-google-refuses-to-make
 **License:** MIT
-**Homepage / downloads:** https://github.com/blunthex1/msm/releases
-**What is signed:** the Windows installers and portable executable (`MSM-for-YouTube-Setup-*.exe`, `MSM-for-YouTube-Portable-*.exe`), built by GitHub Actions (`.github/workflows/build.yml`).
+**Homepage / downloads:** https://github.com/blunthex1/youtube-google-refuses-to-make/releases
+**What is signed:** the Windows installers and portable executable (`YouTube-Google-Refuses-To-Make-Setup-*.exe`, `YouTube-Google-Refuses-To-Make-Portable-*.exe`), built by GitHub Actions (`.github/workflows/build.yml`).
 
 **Description:** A desktop YouTube app for Windows (Electron) with a built-in filter for AI-generated videos, ad and tracker blocking (Ghostery's open-source engine with uBlock Origin / EasyList lists), SponsorBlock sponsor skipping, and a Shorts blocker. The same filter is also published as a browser extension. All code is MIT-licensed; dependencies are open source (Electron, electron-updater, @ghostery/adblocker-electron).
 

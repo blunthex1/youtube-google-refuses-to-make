@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "MSM AI Filter for YouTube",
+  "name": "AI Filter for YouTube (YouTube Google Refuses To Make)",
   "short_name": "AI Filter",
   "version": "0.0.0",
   "description": "Hide AI-generated videos (AI slop) on YouTube. Keyword packs, channel block/allow lists, and YouTube's synthetic-content label.",

@@ -1,4 +1,4 @@
-// MSM for YouTube — desktop app main process.
+// YouTube Google Refuses To Make — desktop app main process.
 // Wraps youtube.com in a dedicated window and runs the AI filter inside it.
 
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, net, session, shell } from 'electron';
@@ -13,7 +13,7 @@ import { checkForUpdatesManually, setupUpdater } from './updater.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const HOME_URL = 'https://www.youtube.com/';
 const PARTITION = 'persist:youtube';
-const PROJECT_URL = 'https://github.com/blunthex1/msm';
+const PROJECT_URL = 'https://github.com/blunthex1/youtube-google-refuses-to-make';
 const isMac = process.platform === 'darwin';
 
 // Google refuses to sign in "embedded browsers"; a Firefox UA on the sign-in pages
@@ -681,7 +681,7 @@ function buildMenu() {
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  if (process.platform === 'win32') app.setAppUserModelId('io.github.blunthex1.msm');
+  if (process.platform === 'win32') app.setAppUserModelId('io.github.blunthex1.youtubegooglerefusestomake');
 
   app.on('second-instance', (_e, argv) => {
     const url = urlFromArgv(argv);

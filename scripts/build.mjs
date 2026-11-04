@@ -28,7 +28,7 @@ async function buildExtension(browser) {
   manifest.version = pkg.version;
   if (browser === 'firefox') {
     manifest.browser_specific_settings = {
-      gecko: { id: 'ai-filter@msm', strict_min_version: '121.0' },
+      gecko: { id: 'ai-filter@ygrtm', strict_min_version: '121.0' },
     };
   }
   await writeFile(path.join(out, 'manifest.json'), JSON.stringify(manifest, null, 2));

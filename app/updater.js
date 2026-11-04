@@ -27,7 +27,7 @@ function friendlyError(err) {
   if (/\b404\b/.test(msg) || /No published versions/i.test(msg))
     return (
       'No published release was found on GitHub.\n\n' +
-      'Updates come from the GitHub Releases page of blunthex1/msm. That page has to be public ' +
+      'Updates come from the GitHub Releases page of blunthex1/youtube-google-refuses-to-make. That page has to be public ' +
       '(a private repo hides its releases from the app) and have at least one release published.'
     );
   if (/ENOTFOUND|ETIMEDOUT|ECONNREFUSED|ERR_INTERNET_DISCONNECTED|net::/i.test(msg))
@@ -36,7 +36,7 @@ function friendlyError(err) {
 }
 
 function show(opts) {
-  return dialog.showMessageBox({ title: 'MSM for YouTube', ...opts });
+  return dialog.showMessageBox({ title: 'YouTube Google Refuses To Make', ...opts });
 }
 
 async function offerRestart(version) {

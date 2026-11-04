@@ -1,8 +1,8 @@
-# MSM — YouTube without the AI slop
+# YouTube Google Refuses To Make — YouTube without the AI slop
 
 Two things in one repo, sharing one filter engine:
 
-1. **MSM for YouTube**: a dedicated desktop YouTube app for Windows (also builds for macOS and Linux). It's a focused YouTube window with its own menu, mouse back/forward buttons, saved sign-in and window position, and the AI filter built in.
+1. **YouTube Google Refuses To Make**: a dedicated desktop YouTube app for Windows (also builds for macOS and Linux). It's a focused YouTube window with its own menu, mouse back/forward buttons, saved sign-in and window position, and the AI filter built in.
 2. **AI Filter for YouTube**: a browser extension for Chrome, Edge and Firefox that hides AI-generated videos on youtube.com.
 
 ## What the filter does
@@ -23,7 +23,7 @@ Two things in one repo, sharing one filter engine:
 ## Desktop app (Windows)
 
 ### Install
-Download `MSM-for-YouTube-Setup-<version>-x64.exe` (or the portable `.exe`) from the GitHub **Releases** page, or from the `windows-app` artifact of the latest **Build** workflow run.
+Download `YouTube-Google-Refuses-To-Make-Setup-<version>-x64.exe` (or the portable `.exe`) from the GitHub **Releases** page, or from the `windows-app` artifact of the latest **Build** workflow run.
 
 The app isn't code-signed yet, so Windows SmartScreen will warn on first launch: choose **More info → Run anyway**.
 
@@ -43,8 +43,8 @@ The app isn't code-signed yet, so Windows SmartScreen will warn on first launch:
 | `Ctrl+N` | New window |
 
 - Links to other sites open in your normal browser. YouTube and Google sign-in stay in the app.
-- You can launch it with a URL (`MSM.exe https://youtu.be/...`) to open that video.
-- Settings are stored in `%APPDATA%\MSM for YouTube\config.json`.
+- You can launch it with a URL (`YGRTM.exe https://youtu.be/...`) to open that video.
+- Settings are stored in `%APPDATA%\YouTube Google Refuses To Make\config.json`.
 
 **Signing in:** Google sometimes blocks sign-in from "embedded" browsers. The app shows Google's sign-in pages a standard Firefox user-agent, the usual workaround. If Google still refuses, please open an issue.
 
@@ -53,7 +53,7 @@ The app blocks ads and trackers the way Brave Shields does. It uses [Ghostery's 
 
 ## Privacy
 
-MSM has no account, no analytics and no telemetry, and your settings never leave your machine. The only network requests it makes are:
+The app has no account, no analytics and no telemetry, and your settings never leave your machine. The only network requests it makes are:
 
 - **YouTube itself**, which the app displays (and Google sign-in, if you choose to sign in).
 - **Filter lists** (desktop app): uBlock Origin and EasyList lists, fetched from their public hosts every 12 hours.
