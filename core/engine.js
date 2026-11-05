@@ -361,7 +361,9 @@ export function createFilter({ storage, doc = document, win = window, debounceMs
       else root.removeAttribute(CINEMA_ATTR);
       win.dispatchEvent(new win.Event('resize')); // let the player re-measure
     }
-    const wantTheater = size !== 'default';
+    // 'default' leaves YouTube (and the Focus layout options) alone; only act when a size is chosen.
+    if (size === 'default') return;
+    const wantTheater = true;
     // YouTube reads its "wide" cookie on page load; keep it matching so the first frame is right.
     setWideCookie(wantTheater);
     if (!onWatch) return;
