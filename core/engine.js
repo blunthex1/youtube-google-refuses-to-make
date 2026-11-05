@@ -112,6 +112,31 @@ export function createFilter({ storage, doc = document, win = window, debounceMs
     target.removeAttribute(ATTR);
     if (target !== card) card.removeAttribute(ATTR);
     for (const o of target.querySelectorAll(':scope > .' + OVERLAY_CLASS)) o.remove();
+    for (const o of card.querySelectorAll(':scope > .aif-hoverblock, :scope > .aif-possible')) o.remove();
+  }
+
+  // "Block channel" button on hover, and the "Possibly AI" badge.
+  function decorateCard(card, meta, verdict) {
+    if (verdict.blocked) return;
+    if (settings.hoverBlock && meta.channel && (meta.channel.handle || meta.channel.id || meta.channel.name)) {
+      const name = meta.channel.name || meta.channel.handle || 'channel';
+      card.append(
+        h(
+          doc,
+          'button',
+          {
+            type: 'button',
+            class: 'aif-hoverblock',
+            title: `Block ${name}`,
+            onclick: guard(() => actions.blockChannel(meta.channel)),
+          },
+          'Block channel',
+        ),
+      );
+    }
+    if (verdict.kind === 'possible') {
+      card.append(h(doc, 'span', { class: 'aif-possible', title: verdict.reason || '' }, 'Possibly AI'));
+    }
   }
 
   function buildOverlay(meta, verdict) {
@@ -140,9 +165,16 @@ export function createFilter({ storage, doc = document, win = window, debounceMs
   function processCard(card, pageChannel) {
     const meta = extractCard(card, pageChannel);
     const ch = meta.channel;
-    const sig = [version, meta.title, meta.description, meta.videoId, ch?.handle, ch?.id, ch?.name].join(
-      '\u0001',
-    );
+    const sig = [
+      version,
+      meta.title,
+      meta.description,
+      meta.videoId,
+      ch?.handle,
+      ch?.id,
+      ch?.name,
+      meta.newestUploadDate ? new Date(meta.newestUploadDate).getUTCFullYear() : '',
+    ].join('\u0001');
 
     const prev = cardState.get(card);
     const target = hideTarget(card);
@@ -164,6 +196,7 @@ export function createFilter({ storage, doc = document, win = window, debounceMs
       if (settings.mode === 'blur') target.append(buildOverlay(meta, verdict));
     }
     cardState.set(card, { sig, target, blocked: verdict.blocked, key });
+    decorateCard(card, meta, verdict);
   }
 
   // ---- page bar (watch & channel pages) ------------------------------------
@@ -174,7 +207,7 @@ export function createFilter({ storage, doc = document, win = window, debounceMs
   }
 
   function renderBar(ctx) {
-    if (!settings.enabled || !settings.showPageBar || !ctx.channel || !ctx.anchor) {
+    if ((!settings.enabled && !settings.blockedEnabled) || !settings.showPageBar || !ctx.channel || !ctx.anchor) {
       removeBar();
       return;
     }
@@ -184,7 +217,15 @@ export function createFilter({ storage, doc = document, win = window, debounceMs
     const allowed = channelInList(channel, settings.allowedChannels);
     const verdict =
       ctx.type === 'watch' && !blocked && !allowed
-        ? evaluate({ title: ctx.title, channel, description: ctx.description }, compiled)
+        ? evaluate(
+            {
+              title: ctx.title,
+              channel,
+              description: [ctx.description, settings.scanWatchPage ? ctx.tags : ''].filter(Boolean).join(' '),
+              newestUploadDate: ctx.newestUploadDate,
+            },
+            compiled,
+          )
         : { blocked: false };
 
     let tone = 'neutral';

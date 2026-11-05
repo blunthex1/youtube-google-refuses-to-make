@@ -40,7 +40,69 @@ const METADATA_ROW_SELECTOR =
 const DESCRIPTION_SELECTORS = ['#description-text', '.metadata-snippet-text', '#description'];
 
 function text(el) {
-  return (el?.textContent || '').replace(/\s+/g, ' ').trim();
+  let raw = el?.textContent || '';
+  // Ignore our own injected buttons/badges so they never change a card's title or channel.
+  if (el?.querySelector?.('.aif-hoverblock, .aif-possible')) {
+    const copy = el.cloneNode(true);
+    for (const b of copy.querySelectorAll('.aif-hoverblock, .aif-possible')) b.remove();
+    raw = copy.textContent || '';
+  }
+  return raw.replace(/\s+/g, ' ').trim();
+}
+
+const AGE_UNITS = {
+  second: 1e3,
+  minute: 6e4,
+  hour: 36e5,
+  day: 864e5,
+  week: 7 * 864e5,
+  month: 30.44 * 864e5,
+  year: 365.25 * 864e5,
+};
+const YEAR_WORDS = [
+  'years?', 'años?', 'ans?', 'années?', 'jahre[n]?', 'jahr', 'anos?', 'ann[oi]', 'jaar', 'jaren', 'år', 'års',
+  'год[а]?', 'лет', 'рік', 'роки', 'років', 'rok[ua]?', 'lat[a]?', 'roky', 'rokov', 'rokmi', 'yıl',
+  'vuo(?:si|tta)', 'év(?:e|vel)?', 'χρόνια', 'χρόνο', 'năm', 'tahun', 'taon', 'سنة', 'سنوات', 'سنتين',
+  'साल', 'वर्ष', 'aasta[t]?', 'metai', 'metus', 'gad[iu]?', 'godin[ae]?', 'leto', 'let', 'ani', 'an',
+].join('|');
+const YEARS_RE = new RegExp(`(?:^|[^\\p{L}\\p{N}])(\\d+)\\s?(?:${YEAR_WORDS})(?![\\p{L}])`, 'iu');
+const YEARS_CJK_RE = /(\d+)\s?(?:年|년|ปี)/u;
+
+/** Estimate an upload timestamp from text like "3 years ago" (any common language); null if none. */
+export function parseUploadAge(str, now = Date.now()) {
+  const s = String(str || '');
+  const en = /(?:^|[^\p{L}\p{N}])(\d+)\s+(second|minute|hour|day|week|month|year)s?\s+ago(?![\p{L}\p{N}])/iu.exec(s);
+  if (en) return now - parseInt(en[1], 10) * AGE_UNITS[en[2].toLowerCase()];
+  const years = YEARS_RE.exec(s) || YEARS_CJK_RE.exec(s);
+  if (years) return now - parseInt(years[1], 10) * AGE_UNITS.year;
+  return null;
+}
+
+const AGE_SELECTORS = [
+  '#metadata-line',
+  '#metadata',
+  '.inline-metadata-item',
+  METADATA_ROW_SELECTOR,
+  '.ytp-videowall-still-info-author',
+].join(', ');
+
+function cardUploadDate(card) {
+  for (const el of card.querySelectorAll(AGE_SELECTORS)) {
+    const d = parseUploadAge(text(el));
+    if (d) return d;
+  }
+  return null;
+}
+
+function watchUploadDate(doc, flexy) {
+  const iso = doc
+    .querySelector('meta[itemprop="datePublished"], meta[itemprop="uploadDate"]')
+    ?.getAttribute('content');
+  if (iso) {
+    const t = Date.parse(iso);
+    if (!Number.isNaN(t)) return t;
+  }
+  return parseUploadAge(text(flexy.querySelector('ytd-watch-metadata #info, #info-container, #info-strings, #info')));
 }
 
 function firstText(root, selectors) {
@@ -138,7 +200,7 @@ export function extractCard(card, pageChannel = null) {
   const channel = cardChannel(card) || pageChannel || null;
   const description = firstText(card, DESCRIPTION_SELECTORS);
   const videoId = cardVideoId(card);
-  return { title, channel, description, videoId };
+  return { title, channel, description, videoId, newestUploadDate: cardUploadDate(card) };
 }
 
 /** The element to hide for a card (shorts inside grid shelves have a wrapper cell). */
@@ -286,6 +348,7 @@ export function getPageContext(doc, loc) {
     const owner = meta.querySelector('#owner') || flexy.querySelector('ytd-video-owner-renderer') || meta;
     const channel = cardChannel(owner);
     const descEl = meta.querySelector('#description') || flexy.querySelector('#description');
+    const tags = [...meta.querySelectorAll('a[href*="/hashtag/"]')].map((a) => text(a)).join(' ');
     const description = text(descEl).slice(0, 5000);
     const disclosed =
       !!flexy.querySelector('how-this-was-made-section-view-model') || DISCLOSURE_TEXT.test(text(descEl));
@@ -295,7 +358,9 @@ export function getPageContext(doc, loc) {
       title,
       channel,
       description,
+      tags,
       disclosed,
+      newestUploadDate: watchUploadDate(doc, flexy),
       anchor: meta.tagName.toLowerCase() === 'ytd-watch-metadata' ? meta : null,
     };
   }

@@ -23,7 +23,7 @@ test('default pack catches typical AI-generated titles', () => {
     'Ranking the BEST Ai Cat Moments #shorts #viral',
     'Made with Sora 2 — Underwater city',
     'Veo3 test: dragons over London',
-    'Lofi beats but every song is made by Suno',
+    'Lofi beats but every song is made with Suno',
     'Dancing grandma #aiart #fyp',
     'Midjourney V7 portraits',
     '𝐀𝐈 𝐆𝐞𝐧𝐞𝐫𝐚𝐭𝐞𝐝 cartoon', // stylised unicode
@@ -136,4 +136,40 @@ test('URL and input parsing', () => {
   assert.equal(parseChannelInput('youtube.com/@bar/shorts').handle, '@bar');
   assert.deepEqual(parseChannelInput('Some Channel'), { name: 'Some Channel' });
   assert.equal(normalizeText('  Ａ  B​ C '), 'a b c');
+});
+
+test('skipOldVideos ignores keywords on old videos but not channel blocks', () => {
+  const y2020 = Date.UTC(2020, 5, 1);
+  const r = rules({ blockedChannels: [{ key: '@bad', name: 'Bad' }] });
+  assert.equal(evaluate({ title: 'AI art demo', newestUploadDate: y2020 }, r).blocked, false);
+  assert.equal(evaluate({ title: 'AI art demo', newestUploadDate: Date.now() }, r).blocked, true);
+  assert.equal(evaluate({ title: 'x', channel: { handle: '@bad' }, newestUploadDate: y2020 }, r).blocked, true);
+  const off = rules({ skipOldVideos: false });
+  assert.equal(evaluate({ title: 'AI art demo', newestUploadDate: y2020 }, off).blocked, true);
+});
+
+test('blockedEnabled works independent of the filter switch', () => {
+  const list = [{ key: '@bad', name: 'Bad' }];
+  const ch = { handle: '@bad' };
+  assert.equal(evaluate({ title: 'x', channel: ch }, rules({ enabled: false, blockedChannels: list })).blocked, true);
+  assert.equal(
+    evaluate({ title: 'x', channel: ch }, rules({ blockedEnabled: false, blockedChannels: list })).blocked,
+    false,
+  );
+});
+
+test('possible badge is a soft signal that never blocks', () => {
+  const v = evaluate({ title: 'Shocking true story' }, rules({ possible: true }));
+  assert.equal(v.blocked, false);
+  assert.equal(v.kind, 'possible');
+  assert.equal(evaluate({ title: 'Shocking true story' }, rules()).kind, undefined);
+});
+
+test('parseUploadAge and new settings sanitize', async () => {
+  const { parseUploadAge } = await import('../core/youtube.js');
+  const now = Date.UTC(2026, 0, 1);
+  assert.ok(parseUploadAge('3 years ago', now) < Date.UTC(2023, 0, 5));
+  assert.equal(parseUploadAge('2 days ago', now) > Date.UTC(2025, 11, 1), true);
+  assert.equal(sanitizeSettings({ oldVideoYear: 5 }).oldVideoYear, 2022);
+  assert.equal(sanitizeSettings({}).blockedEnabled, true);
 });

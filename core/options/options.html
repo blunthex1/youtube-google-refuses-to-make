@@ -47,6 +47,28 @@
           <span>Also match keywords in description snippets (search results)</span>
         </label>
         <label class="check">
+          <input type="checkbox" id="blockedEnabled" />
+          <span>Apply my blocked channels list (works even when the filter above is off)</span>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="hoverBlock" />
+          <span>Show a “Block channel” button when hovering a video</span>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="skipOldVideos" />
+          <span>Don’t apply keywords to videos uploaded before
+            <input type="number" id="oldVideoYear" min="2015" max="2100" step="1" style="width:5em" />
+            (channel block lists still apply)</span>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="possible" />
+          <span>Show a “Possibly AI” badge on videos with softer signals (never hides)</span>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="scanWatchPage" />
+          <span>Also read hashtags on the video page I open</span>
+        </label>
+        <label class="check">
           <input type="checkbox" id="detectDisclosure" />
           <span>Flag videos YouTube labels “Altered or synthetic content”</span>
         </label>

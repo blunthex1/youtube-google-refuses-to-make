@@ -12,6 +12,39 @@
   border-radius: 12px;
 }
 
+:has(> .aif-hoverblock, > .aif-possible):not([data-aif]) {
+  position: relative;
+}
+.aif-hoverblock {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 60;
+  display: none;
+  padding: 4px 8px;
+  font: 500 12px Roboto, Arial, sans-serif;
+  color: #fff;
+  background: rgba(200, 30, 30, 0.92);
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+:hover > .aif-hoverblock {
+  display: block;
+}
+.aif-possible {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 55;
+  padding: 2px 6px;
+  font: 500 11px Roboto, Arial, sans-serif;
+  color: #1a1a1a;
+  background: rgba(255, 196, 0, 0.92);
+  border-radius: 6px;
+  pointer-events: auto;
+}
+
 .aif-overlay {
   position: absolute;
   inset: 0;

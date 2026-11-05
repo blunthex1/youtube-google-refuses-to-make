@@ -1,6 +1,6 @@
 // Pure matching logic — no DOM access, so it can be unit tested in Node.
 
-import { DEFAULT_SETTINGS, KEYWORD_PACKS } from './defaults.js';
+import { DEFAULT_SETTINGS, KEYWORD_PACKS, NAME_SHAPES, WEAK_KEYWORDS } from './defaults.js';
 
 const WORD_CHAR = '[\\p{L}\\p{N}_]';
 
@@ -49,11 +49,19 @@ export function isRegexKeyword(keyword) {
   return /^\/.+\/[a-z]*$/s.test(String(keyword).trim());
 }
 
+/** Reject regexes with nested quantifiers, which can freeze the page (catastrophic backtracking). */
+export function isRiskyRegex(keyword) {
+  const src = String(keyword).trim().replace(/^\/|\/[a-z]*$/g, '').replace(/\\./g, 'x');
+  if (/\((?:[^()]*[+*]|[^()]*\{\d*,\d*\})[^()]*\)\s*(?:[+*]|\{\d*,)/.test(src)) return true;
+  return /\([^()]*\|[^()]*\)\s*(?:[+*]|\{\d*,)/.test(src);
+}
+
 /**
  * Compile settings into a fast matcher.
- * Returns { matchText(text) -> keyword|null, settings }.
+ * Returns { matchText(text) -> keyword|null, matchWeak, weakName, settings }.
+ * weakPass compiles only the soft "possibly AI" keywords.
  */
-export function compileRules(settings) {
+export function compileRules(settings, weakPass = false) {
   const ignored = new Set((settings.ignoredKeywords || []).map(normalizeText));
   const plain = new Map(); // regex source -> display keyword
   const regexes = [];
@@ -62,7 +70,7 @@ export function compileRules(settings) {
     if (typeof kw !== 'string' || !kw.trim()) return;
     if (isRegexKeyword(kw)) {
       const re = parseRegexKeyword(kw);
-      if (re) regexes.push({ re, keyword: kw.trim() });
+      if (re && !isRiskyRegex(kw)) regexes.push({ re, keyword: kw.trim() });
       return;
     }
     if (ignored.has(normalizeText(kw))) return;
@@ -70,10 +78,15 @@ export function compileRules(settings) {
     if (src && !plain.has(src)) plain.set(src, kw.trim());
   };
 
-  for (const [packId, pack] of Object.entries(KEYWORD_PACKS)) {
-    if (settings.packs?.[packId]) pack.keywords.forEach(add);
+  if (weakPass) {
+    WEAK_KEYWORDS.forEach(add);
+    (settings.possibleKeywords || []).forEach(add);
+  } else {
+    for (const [packId, pack] of Object.entries(KEYWORD_PACKS)) {
+      if (settings.packs?.[packId]) pack.keywords.forEach(add);
+    }
+    (settings.customKeywords || []).forEach(add);
   }
-  (settings.customKeywords || []).forEach(add);
 
   // Longer keywords first so the reported match is the most specific one.
   const entries = [...plain.entries()]
@@ -94,13 +107,17 @@ export function compileRules(settings) {
         return m[0];
       }
     }
+    const short = t.length > 300 ? t.slice(0, 300) : t;
     for (const { re, keyword } of regexes) {
-      if (re.test(t)) return keyword;
+      if (re.test(short)) return keyword;
     }
     return null;
   }
 
-  return { matchText, settings };
+  if (weakPass) return { matchText, settings };
+  const matchWeak = settings.possible ? compileRules(settings, true).matchText : null;
+  const weakName = settings.possible ? (name) => NAME_SHAPES.some((re) => re.test(normalizeText(name))) : null;
+  return { matchText, matchWeak, weakName, settings };
 }
 
 // ---------------------------------------------------------------------------
@@ -172,14 +189,18 @@ export function removeChannel(list, channel) {
  */
 export function evaluate(meta, compiled) {
   const s = compiled.settings;
-  if (!s.enabled) return { blocked: false };
   const channel = meta.channel;
 
   if (channelInList(channel, s.allowedChannels)) return { blocked: false, kind: 'allowed' };
 
-  const blockedEntry = channelInList(channel, s.blockedChannels);
+  const blockedEntry = s.blockedEnabled ? channelInList(channel, s.blockedChannels) : null;
   if (blockedEntry) {
     return { blocked: true, kind: 'channel', reason: `Blocked channel: ${blockedEntry.name}` };
+  }
+  if (!s.enabled) return { blocked: false };
+
+  if (s.skipOldVideos && meta.newestUploadDate && meta.newestUploadDate < Date.UTC(s.oldVideoYear, 0, 1)) {
+    return { blocked: false, kind: 'old' };
   }
 
   const titleHit = compiled.matchText(meta.title);
@@ -193,6 +214,14 @@ export function evaluate(meta, compiled) {
   if (s.matchDescriptions && meta.description) {
     const hit = compiled.matchText(meta.description);
     if (hit) return { blocked: true, kind: 'description', reason: `Description matches “${hit}”` };
+  }
+
+  if (s.possible) {
+    const weak = meta.title && compiled.matchWeak ? compiled.matchWeak(meta.title) : null;
+    if (weak) return { blocked: false, kind: 'possible', reason: `Possibly AI: title has “${weak}”` };
+    if (channel?.name && compiled.weakName?.(channel.name)) {
+      return { blocked: false, kind: 'possible', reason: 'Possibly AI: channel name looks mass-produced' };
+    }
   }
 
   return { blocked: false };
@@ -233,6 +262,16 @@ export function sanitizeSettings(raw) {
   for (const id of Object.keys(KEYWORD_PACKS)) packs[id] = bool(r.packs?.[id], d.packs[id]);
   return {
     enabled: bool(r.enabled, d.enabled),
+    blockedEnabled: bool(r.blockedEnabled, d.blockedEnabled),
+    hoverBlock: bool(r.hoverBlock, d.hoverBlock),
+    skipOldVideos: bool(r.skipOldVideos, d.skipOldVideos),
+    oldVideoYear:
+      Number.isInteger(r.oldVideoYear) && r.oldVideoYear >= 2015 && r.oldVideoYear <= 2100
+        ? r.oldVideoYear
+        : d.oldVideoYear,
+    possible: bool(r.possible, d.possible),
+    possibleKeywords: cleanStrings(r.possibleKeywords),
+    scanWatchPage: bool(r.scanWatchPage, d.scanWatchPage),
     mode: r.mode === 'blur' || r.mode === 'hide' ? r.mode : d.mode,
     packs,
     customKeywords: cleanStrings(r.customKeywords),

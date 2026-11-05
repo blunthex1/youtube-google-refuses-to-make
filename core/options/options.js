@@ -82,6 +82,11 @@ export function mountOptions(storage, doc = document) {
 
   const bools = [
     'enabled',
+    'blockedEnabled',
+    'hoverBlock',
+    'skipOldVideos',
+    'possible',
+    'scanWatchPage',
     'matchChannelNames',
     'matchDescriptions',
     'detectDisclosure',
@@ -93,6 +98,7 @@ export function mountOptions(storage, doc = document) {
     'skipSponsors',
   ];
   for (const id of bools) $(id).addEventListener('change', (e) => save({ [id]: e.target.checked }));
+  $('oldVideoYear').addEventListener('change', (e) => save({ oldVideoYear: parseInt(e.target.value, 10) }));
 
   for (const radio of doc.querySelectorAll('input[name="mode"]')) {
     radio.addEventListener('change', () => radio.checked && save({ mode: radio.value }));
@@ -217,6 +223,8 @@ export function mountOptions(storage, doc = document) {
 
   function renderAll() {
     for (const id of bools) $(id).checked = settings[id];
+    $('oldVideoYear').value = settings.oldVideoYear;
+    $('oldVideoYear').disabled = !settings.skipOldVideos;
     for (const radio of doc.querySelectorAll('input[name="mode"]'))
       radio.checked = radio.value === settings.mode;
     for (const radio of doc.querySelectorAll('input[name="playerSize"]'))
