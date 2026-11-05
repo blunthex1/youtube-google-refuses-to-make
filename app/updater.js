@@ -16,6 +16,11 @@ const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
 let manualCheck = false; // show "you're up to date" / errors only when the user asked
 let downloaded = null; // version waiting to install
 let prompting = false;
+let beforeRestart = null;
+
+export function setBeforeRestart(fn) {
+  beforeRestart = fn;
+}
 
 export function updatesSupported() {
   return app.isPackaged && !process.env.PORTABLE_EXECUTABLE_DIR && process.platform !== 'linux';
@@ -51,7 +56,12 @@ async function offerRestart(version) {
       message: `Version ${version} is ready to install.`,
       detail: 'Restart now to update, or it will install automatically the next time you close the app.',
     });
-    if (response === 0) setImmediate(() => autoUpdater.quitAndInstall());
+    if (response === 0) {
+      try {
+        await beforeRestart?.();
+      } catch {}
+      setImmediate(() => autoUpdater.quitAndInstall());
+    }
   } finally {
     prompting = false;
   }

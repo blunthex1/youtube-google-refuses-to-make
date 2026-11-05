@@ -4,11 +4,11 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, net, session, shell } from 'electron';
 import { ElectronBlocker } from '@ghostery/adblocker-electron';
 import { existsSync } from 'node:fs';
-import { readFile, rename, stat, writeFile } from 'node:fs/promises';
+import { readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sanitizeSettings } from '../core/rules.js';
-import { checkForUpdatesManually, setupUpdater } from './updater.js';
+import { checkForUpdatesManually, setupUpdater, setBeforeRestart } from './updater.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const HOME_URL = 'https://www.youtube.com/';
@@ -281,6 +281,29 @@ function setQuality(id) {
 // Windows
 
 const ytWindows = new Set();
+
+const resumePath = () => path.join(app.getPath('userData'), 'resume.json');
+
+// Remember the video being watched so the app can pick it up again after an update restart.
+async function saveResumeUrl() {
+  const wc = [...ytWindows].at(-1)?.webContents;
+  if (!wc || !/^\/(watch|shorts|live)\b/.test(new URL(wc.getURL()).pathname)) return;
+  const t = await wc
+    .executeJavaScript('Math.floor(document.querySelector("video")?.currentTime || 0)')
+    .catch(() => 0);
+  const u = new URL(wc.getURL());
+  if (t > 5 && u.pathname === '/watch') u.searchParams.set('t', `${t}s`);
+  await writeFile(resumePath(), JSON.stringify({ url: u.href, at: Date.now() }));
+}
+
+async function takeResumeUrl() {
+  try {
+    const { url, at } = JSON.parse(await readFile(resumePath(), 'utf8'));
+    await unlink(resumePath()).catch(() => {});
+    if (Date.now() - at < 10 * 60 * 1000 && isYouTubeHost(hostOf(url))) return url;
+  } catch {}
+  return null;
+}
 let settingsWin = null;
 let focusWin = null;
 
@@ -780,7 +803,8 @@ if (!app.requestSingleInstanceLock()) {
     // Open the first page only once Shields is active (a few seconds at most), so the page
     // never loads half-blocked.
     await Promise.race([shieldsReady, new Promise((r) => setTimeout(r, 5000))]);
-    createYouTubeWindow(urlFromArgv(process.argv) || HOME_URL, { restoreState: true });
+    createYouTubeWindow(urlFromArgv(process.argv) || (await takeResumeUrl()) || HOME_URL, { restoreState: true });
+    setBeforeRestart(saveResumeUrl);
     setupUpdater();
 
     app.on('activate', () => {
