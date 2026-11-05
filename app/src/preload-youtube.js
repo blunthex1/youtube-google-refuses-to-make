@@ -1,8 +1,12 @@
 // Runs in the YouTube window's isolated world (sandboxed). Nothing is exposed to
-// the page itself; the filter talks to the main process over IPC.
+// the page itself. Two things run here:
+//  - Focus (focus/): layout, cleanup, audio and its full AI filter (aifilter.js), all
+//    talking to the main process through a chrome.storage / chrome.runtime stand-in.
+//  - The app's own extras (core/engine.js in appOnly mode): ad skipping, SponsorBlock,
+//    Shorts / Playables hiding. Its keyword filter is off so only Focus's filter runs.
 
-import { contextBridge, ipcRenderer, webFrame } from 'electron';
-import css from '../../core/filter.css';
+import { ipcRenderer, webFrame, contextBridge } from 'electron';
+import css from './app-features.css';
 import { createFilter } from '../../core/engine.js';
 import { installAdPrune } from '../../core/adprune.js';
 import focusCss from '../../focus/styles.css';
@@ -11,33 +15,38 @@ import { runEarly } from '../../focus/early.js';
 import { runAudio } from '../../focus/audio.js';
 import { makeChrome } from './focus-chrome.js';
 
-// Focus layout/cleanup/audio scripts (see focus/). They are off until enabled in
-// Focus settings, and share nothing with the AI filter below.
+const whenRoot = (fn) => {
+  if (document.documentElement) return fn();
+  const mo = new MutationObserver(() => {
+    if (!document.documentElement) return;
+    mo.disconnect();
+    fn();
+  });
+  mo.observe(document, { childList: true });
+};
+
 try {
   globalThis.chrome = makeChrome();
   webFrame.insertCSS(focusCss);
-  const whenRoot = (fn) => {
-    if (document.documentElement) return fn();
-    const mo = new MutationObserver(() => {
-      if (!document.documentElement) return;
-      mo.disconnect();
-      fn();
-    });
-    mo.observe(document, { childList: true });
-  };
   // The page script reads document.documentElement immediately, so wait for it.
   whenRoot(() => webFrame.executeJavaScript(focusPageSource).catch(() => {}));
   whenRoot(runEarly);
+  // Focus's AI filter content script (self-starting, bundled lazily so it waits for the root).
+  if (!location.pathname.startsWith('/audiolibrary/') && !location.pathname.startsWith('/tv')) {
+    whenRoot(() => require('../../focus/aifilter.js'));
+  }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', runAudio, { once: true });
   else runAudio();
 } catch (err) {
   console.error('YGRTM: Focus scripts not installed', err);
 }
 
+// App-only options (skip ads, SponsorBlock, Shorts, Playables) live in the main process.
+const forApp = (s) => ({ ...s, enabled: true });
 const storage = {
-  load: () => ipcRenderer.invoke('aif:load'),
-  save: (settings) => ipcRenderer.invoke('aif:save', settings),
-  subscribe: (cb) => ipcRenderer.on('aif:changed', (_e, settings) => cb(settings)),
+  load: async () => forApp(await ipcRenderer.invoke('app:load')),
+  save: async () => {},
+  subscribe: (cb) => ipcRenderer.on('app:changed', (_e, settings) => cb(forApp(settings))),
 };
 
 // Runs in the page's own world before YouTube's scripts: strips ad data from player
@@ -59,10 +68,15 @@ const adHooks = {
   onStuck: (videoId) => ipcRenderer.send('aif:ad-stuck', videoId),
 };
 
-const filter = createFilter({ storage, adHooks });
+const filter = createFilter({ storage, adHooks, appOnly: true });
 filter.init();
 
+// "Block This Channel" menu item: add the channel on the page to Focus's AI channel list.
 ipcRenderer.on('aif:block-page-channel', () => {
   const channel = filter.getPageChannel();
-  if (channel) filter.actions.blockChannel(channel);
+  if (channel) {
+    globalThis.chrome.runtime
+      .sendMessage({ type: 'aif:update', op: { op: 'add', list: 'aiChannels', channel } })
+      .catch(() => {});
+  }
 });

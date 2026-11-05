@@ -1,7 +1,7 @@
 {
   "name": "youtube-google-refuses-to-make",
   "productName": "YouTube Google Refuses To Make",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "A desktop YouTube app for Windows with a built-in AI-content filter, plus the same filter as a browser extension.",
   "author": "blunthex1",
   "license": "MIT",
@@ -37,6 +37,8 @@
       "package.json",
       "app/main.js",
       "app/updater.js",
+      "app/appsettings.js",
+      "app/background-host.js",
       "app/dist/**",
       "app/build/icon.png",
       "core/**/*.js",

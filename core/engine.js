@@ -57,7 +57,7 @@ function guard(fn) {
   };
 }
 
-export function createFilter({ storage, doc = document, win = window, debounceMs = 120, adHooks = {} }) {
+export function createFilter({ storage, doc = document, win = window, debounceMs = 120, adHooks = {}, appOnly = false }) {
   let settings = null;
   let compiled = null;
   let version = 0;
@@ -304,15 +304,18 @@ export function createFilter({ storage, doc = document, win = window, debounceMs
     timer = null;
     if (stopped || !settings || !doc.documentElement) return;
     blockedOnPage = new Set();
-    const ctx = handlePage();
-    const pageChannel = ctx.type === 'channel' ? ctx.channel : null;
-    for (const card of doc.querySelectorAll(CARD_SELECTOR)) {
-      if (isNestedCard(card)) continue;
-      processCard(card, pageChannel);
+    // appOnly: the desktop app lets Focus's AI filter evaluate cards; only the extras run here.
+    if (!appOnly) {
+      const ctx = handlePage();
+      const pageChannel = ctx.type === 'channel' ? ctx.channel : null;
+      for (const card of doc.querySelectorAll(CARD_SELECTOR)) {
+        if (isNestedCard(card)) continue;
+        processCard(card, pageChannel);
+      }
     }
     hidePlayables();
     hideShorts();
-    playerLayout();
+    if (!appOnly) playerLayout();
     adSkipper.update(win.location.pathname === '/watch' && settings.skipAds);
     playerWatchdog();
     skipper.update(

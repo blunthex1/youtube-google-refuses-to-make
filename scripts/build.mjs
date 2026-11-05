@@ -58,9 +58,9 @@ async function buildApp() {
   await rm(out, { recursive: true, force: true });
   await mkdir(out, { recursive: true });
   await Promise.all([
-    cp(r('core', 'options', 'options.html'), path.join(out, 'settings.html')),
-    cp(r('core', 'options', 'options.css'), path.join(out, 'options.css')),
     cp(r('focus', 'options'), path.join(out, 'focus-options'), { recursive: true }),
+    // Focus's background script runs in the main process (app/background-host.js).
+    cp(r('focus', 'background.js'), path.join(out, 'focus-background.js')),
   ]);
   return [
     {
@@ -73,14 +73,8 @@ async function buildApp() {
       loader: { '.css': 'text', '.txt': 'text' },
       entryPoints: {
         'preload-youtube': r('app', 'src', 'preload-youtube.js'),
-        'preload-settings': r('app', 'src', 'preload-settings.js'),
         'preload-focus-settings': r('app', 'src', 'preload-focus-settings.js'),
       },
-      outdir: out,
-    },
-    {
-      ...common,
-      entryPoints: { options: r('app', 'src', 'settings-entry.js') },
       outdir: out,
     },
   ];

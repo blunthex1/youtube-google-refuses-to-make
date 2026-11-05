@@ -26,7 +26,7 @@ export function makeChrome() {
     runtime: {
       id: 'ygrtm-app',
       getManifest: () => ({ version: 'app' }),
-      sendMessage: () => Promise.resolve(),
+      sendMessage: (msg) => ipcRenderer.invoke('focus:message', msg),
     },
   };
 }

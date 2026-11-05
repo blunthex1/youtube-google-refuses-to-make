@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src https:"
+    />
+    <title>AI Filter Settings</title>
+    <link rel="stylesheet" href="aifilter.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>AI Filter</h1>
+        <p class="sub">Hide AI-generated videos on YouTube.</p>
+        <span id="saved" class="saved" aria-live="polite"></span>
+      </header>
+
+      <section>
+        <label class="switch-row">
+          <span>
+            <strong>Filter enabled</strong>
+            <small>Turn off to see everything without losing your settings.</small>
+          </span>
+          <input type="checkbox" id="enabled" class="switch" />
+        </label>
+        <div class="row">
+          <span><strong>When a video matches</strong></span>
+          <div class="seg" role="radiogroup" aria-label="Filter mode">
+            <label><input type="radio" name="mode" value="hide" /> Hide it</label>
+            <label><input type="radio" name="mode" value="blur" /> Blur with a label</label>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>What to filter</h2>
+        <div id="packs"></div>
+        <label class="check">
+          <input type="checkbox" id="matchChannelNames" />
+          <span>Also match keywords in channel names</span>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="matchDescriptions" />
+          <span>Also match keywords in description snippets (search results)</span>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="detectDisclosure" />
+          <span>Flag videos YouTube labels “Altered or synthetic content”</span>
+        </label>
+        <label class="check indent">
+          <input type="checkbox" id="autoBlockDisclosed" />
+          <span>…and automatically block channels that use that label</span>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="skipOldVideos" />
+          <span
+            >Don't filter videos uploaded before
+            <input type="number" id="oldVideoYear" class="year" min="2015" max="2100" step="1" />
+            <small>AI video generators didn't exist yet. Uses the “x years ago” under each video. Blocked channels
+              are still hidden.</small></span
+          >
+        </label>
+        <label class="check">
+          <input type="checkbox" id="showHomeBar" />
+          <span>Show the AI Filter strip on the YouTube home page (count, Hide/Blur, Pause)</span>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="showPageBar" />
+          <span>Show the AI Filter button on watch and channel pages (block/allow channel; works for any channel, even if the AI filter didn't flag it)</span>
+        </label>
+      </section>
+
+      <section>
+        <h2>Your keywords</h2>
+        <p class="hint">
+          One per line. Matches whole words, case-insensitive. Use <code>/regex/</code> for patterns.
+        </p>
+        <textarea
+          id="customKeywords"
+          rows="5"
+          spellcheck="false"
+          placeholder="ai baby&#10;/\bai\s+(cat|dog)s?\b/"
+        ></textarea>
+        <p id="keywordErrors" class="error"></p>
+        <details id="hitsBox">
+          <summary>Which keywords caught videos <span class="count" id="hitsCount"></span></summary>
+          <p class="sub">How many videos each keyword has hidden, or marked “Possibly AI” (soft keywords), since you started counting. A keyword that never shows up here is not doing anything.</p>
+          <ul id="hitList" class="chips"></ul>
+          <div class="add-row"><button type="button" id="hitsRefresh">Refresh</button><button type="button" id="hitsClear" class="danger">Reset counts</button></div>
+        </details>
+        <details>
+          <summary>Never match these built-in keywords</summary>
+          <textarea id="ignoredKeywords" rows="3" spellcheck="false" placeholder="suno"></textarea>
+        </details>
+      </section>
+
+      <section>
+        <h2>Try it</h2>
+        <input type="text" id="tester" placeholder="Paste a video title…" />
+        <p id="testResult" class="test-result"></p>
+      </section>
+
+      <section data-view="blocked">
+        <h2>Blocked channels <span class="count" id="blockedCount"></span></h2>
+        <p class="sub">Channels you blocked with the plain Block button. Their videos are hidden everywhere on YouTube whether the AI filter is on or off, and they are never counted as AI or used for learning.</p>
+        <label class="switch-row">
+          <span>
+            <strong>Blocked channels enabled</strong>
+            <small>Turn off to show everything again without losing the list.</small>
+          </span>
+          <input type="checkbox" id="blockedEnabled" class="switch" />
+        </label>
+        <label class="check">
+          <input type="checkbox" id="hoverBlock" />
+          <span>Show a "Block channel" button when hovering a video</span>
+        </label>
+
+        <form id="blockForm" class="add-row">
+          <input type="text" id="blockInput" placeholder="@handle, channel URL or name" />
+          <button type="submit">Block</button>
+        </form>
+        <div class="add-row"><button type="button" id="blockedExport">Export list (.txt)</button></div>
+        <input type="search" id="blockedSearch" class="list-search" placeholder="Search blocked channels…" hidden />
+        <ul id="blockedChannels" class="chips"></ul>
+      </section>
+
+      <section>
+        <h2>AI channels (yours) <span class="count" id="aiCount"></span></h2>
+        <p class="sub">Channels you blocked as AI (with “Block as AI”, or automatically when a video is labeled as synthetic). You can search this list and remove single channels.</p>
+        <form id="aiForm" class="add-row">
+          <input type="text" id="aiInput" placeholder="@handle, channel URL or name" />
+          <button type="submit">Block as AI</button>
+        </form>
+        <div class="add-row"><button type="button" id="aiExport" title="Saves the channels listed here as a text file, one per line (the same format the import reads)">Export list (.txt)</button></div>
+        <p class="sub" id="aiExportNote">Only channels still listed here are exported. Ones already moved to the archive, and imported lists, are stored as fingerprints and cannot be turned back into names.</p>
+        <input type="search" id="aiSearch" class="list-search" placeholder="Search your AI channels…" hidden />
+        <ul id="aiChannels" class="chips"></ul>
+      </section>
+
+      <section data-view="lists">
+        <h2>Archive of your AI channels</h2>
+        <p class="sub">Channels you block as AI stay in the readable list on the AI Filter tab, then move to a private archive.</p>
+        <div id="archiveBox" class="add-row">
+          <label class="check">
+            <span>After <input type="number" id="archiveDays" class="year" min="0" max="3650" step="1" /> days, move them to the archive (0 = never).
+              <small>The archive still blocks those channels, it just can't be browsed, and imports never change it. <span id="archiveCount"></span></small></span>
+          </label>
+          <button type="button" id="clearArchiveBtn">Clear archive</button>
+        </div>
+      </section>
+
+      <section data-view="lists">
+        <h2>Possibly AI <span class="count" id="reviewCount"></span></h2>
+        <label class="check">
+          <input type="checkbox" id="possible" />
+          <span>Mark videos with softer signals (wording or channel names typical of mass-produced videos) with a small “Possibly AI” badge. They are never hidden. A channel that shows two different signals goes on the list below for you to decide.</span>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="scanWatchPage" />
+          <span>When I open a video, read its description and hashtags. Strong keywords add the channel to your AI channels; softer ones put it on the list below.</span>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="scanChannelPage" />
+          <span>When I open a channel page, read its description the same way.</span>
+        </label>
+        <details>
+          <summary>Your own softer keywords</summary>
+          <textarea id="possibleKeywords" rows="3" spellcheck="false" placeholder="one per line"></textarea>
+        </details>
+        <input type="search" id="reviewSearch" class="list-search" placeholder="Search the review list…" hidden />
+        <ul id="reviewChannels" class="chips"></ul>
+      </section>
+
+      <section id="learnSection" data-view="lists">
+        <h2>Learned words <span class="count" id="learnCount"></span></h2>
+        <label class="check">
+          <input type="checkbox" id="learnWords" />
+          <span>Collect which words show up in titles from channels you blocked as AI, and suggest them here.
+            <small>Only counts of words are kept, on this computer. Nothing is used until you press Add.</small></span>
+        </label>
+        <p class="sub" id="learnNote"></p>
+        <ul id="learnList" class="chips"></ul>
+        <h3>Channel-name words</h3>
+        <p class="sub" id="nameNote"></p>
+        <ul id="nameList" class="chips"></ul>
+        <details>
+          <summary>Name words you added (one per line)</summary>
+          <textarea id="possibleNameWords" rows="2" spellcheck="false" placeholder="stories"></textarea>
+        </details>
+        <div class="add-row"><button type="button" id="learnRefresh">Refresh</button><button type="button" id="learnClear" class="danger">Clear learned data</button></div>
+        <h3>Paste titles</h3>
+        <p class="sub">Paste titles of AI videos that slipped through (one per line). It leaves out the ones your keywords already catch and suggests the phrases the rest have in common.</p>
+        <textarea id="pasteTitles" rows="4" spellcheck="false" placeholder="one title per line"></textarea>
+        <div class="add-row"><button type="button" id="pasteGo">Find phrases</button></div>
+        <p class="sub" id="pasteNote"></p>
+        <ul id="pasteList" class="chips"></ul>
+      </section>
+
+      <section id="importSection" data-view="lists">
+        <h2>Imported lists <span class="count" id="importCount"></span></h2>
+        <p class="sub">Big lists (such as a shared AI channel list). They block channels but are not shown channel by channel. Each import is its own list and can be updated or removed on its own.</p>
+        <ul id="sources" class="chips"></ul>
+        <div class="row">
+          <span><strong>When a list is imported again</strong></span>
+          <div class="seg" role="radiogroup" aria-label="Import mode">
+            <label><input type="radio" name="importMode" value="replace" checked /> Replace it (channels removed upstream disappear)</label>
+            <label><input type="radio" name="importMode" value="add" /> Add to it</label>
+          </div>
+        </div>
+        <input type="text" id="aiImportLabel" placeholder="Name for this list (optional)" />
+        <div class="add-row">
+          <button type="button" id="aiImportFileBtn">Import from file…</button>
+          <input type="file" id="aiImportFile" accept=".txt,.csv,.json,.list,text/plain" hidden />
+        </div>
+        <form id="aiImportLinkForm" class="add-row">
+          <input type="url" id="aiImportUrl" placeholder="https://… link to a list (one channel per line)" />
+          <button type="submit">Import from link</button>
+        </form>
+        <p class="sub" id="aiImportResult">Nothing updates by itself; a list only changes when you press an import button. Channels you allowed are never blocked by an imported list.</p>
+      </section>
+
+      <section>
+        <h2>Always allowed channels <span class="count" id="allowedCount"></span></h2>
+        <form id="allowForm" class="add-row">
+          <input type="text" id="allowInput" placeholder="@handle, channel URL or name" />
+          <button type="submit">Allow</button>
+        </form>
+        <input type="search" id="allowedSearch" class="list-search" placeholder="Search allowed channels…" hidden />
+        <ul id="allowedChannels" class="chips"></ul>
+      </section>
+
+      <section>
+        <h2>Backup</h2>
+        <p class="sub embed-only">Export and import are on the Backup tab, which saves all of Focus including these lists.</p>
+        <div class="add-row">
+          <button type="button" id="exportBtn" class="standalone-only">Export settings</button>
+          <button type="button" id="importBtn" class="standalone-only">Import settings</button>
+          <button type="button" id="resetBtn" class="danger">Reset to defaults</button>
+          <input type="file" id="importFile" accept="application/json,.json" hidden />
+        </div>
+      </section>
+    </main>
+    <script src="shim.js"></script>
+    <script src="aifilter.js"></script>
+  </body>
+</html>

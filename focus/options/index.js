@@ -941,7 +941,7 @@
         return [...heading, renderItem(item)];
       });
       let blocked = null;
-      if (section.title === "Channels") blocked = null;
+      if (section.title === "Channels") blocked = growingFrame("Blocked channels", "aif:height");
       addPane(section.title, el("div", {}, ...rows, ...blocked ? [blocked] : []), blocked ? () => {
         blocked.src = "aifilter.html?embed&view=blocked";
       } : void 0);
@@ -1126,10 +1126,44 @@ ${e.msg}${e.where ? " (" + e.where + ")" : ""}`;
       diagnosticsBox()
     ));
   }
+  function appPane() {
+    const app = window.ygrtmApp;
+    if (!app) return;
+    const ITEMS = [
+      ["shields", "Block ads and trackers (Shields)", "Network-level blocking with the uBlock Origin, EasyList and EasyPrivacy lists. Open YouTube windows reload when you change this."],
+      ["skipAds", "Skip video ads", "Fast-forwards and mutes the ads that still get through, then clicks Skip."],
+      ["skipSponsors", "Skip sponsor and self-promotion segments", "Uses the community SponsorBlock database; only a 4-character hash prefix of the video ID is sent."],
+      ["hideShorts", "Hide YouTube Shorts", "Hides Shorts shelves, cards and the sidebar link; Shorts links open in the normal player."],
+      ["hidePlayables", "Hide YouTube Playables", "Hides the games shelf, game cards and the Playables sidebar link."]
+    ];
+    const boxes = {};
+    const rows = ITEMS.map(([key, label, help]) => {
+      const box = el("input", { id: "app-" + key, type: "checkbox" });
+      boxes[key] = box;
+      box.addEventListener("change", () => {
+        app.save({ [key]: box.checked }).then(flash);
+      });
+      return el("div", { className: "row" }, el("label", { htmlFor: box.id, title: help, textContent: label }), box);
+    });
+    const apply = (s) => {
+      for (const [key, box] of Object.entries(boxes)) box.checked = !!s?.[key];
+    };
+    app.load().then(apply);
+    app.subscribe(apply);
+    addPane("App", el(
+      "div",
+      {},
+      el("p", { textContent: "Options that belong to this desktop app, not to Focus. They apply to every YouTube window." }),
+      ...rows
+    ));
+  }
   if (new URLSearchParams(location.search).has("popup")) document.documentElement.classList.add("popup");
   chrome.storage.local.get(Object.keys(SETTINGS)).then((stored) => {
     $("#version").textContent = "v" + chrome.runtime.getManifest().version;
     renderSettings(stored);
+    framePane("AI Filter", "aifilter.html?embed", "aif:height");
+    framePane("AI Lists", "aifilter.html?embed&view=lists", "aif:height");
+    appPane();
     backupPane();
     let start = 0;
     try {

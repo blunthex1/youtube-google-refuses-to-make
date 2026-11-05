@@ -3,11 +3,12 @@
 
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, net, session, shell } from 'electron';
 import { ElectronBlocker } from '@ghostery/adblocker-electron';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { sanitizeSettings } from '../core/rules.js';
+import { migrateOldFilter, sanitizeApp } from './appsettings.js';
+import { startBackground } from './background-host.js';
 import { checkForUpdatesManually, setupUpdater, setBeforeRestart } from './updater.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -23,39 +24,71 @@ const SIGN_IN_UA = isMac
   : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0';
 
 // ---------------------------------------------------------------------------
-// Persistent config (filter settings + window state)
+// Persistent config. `focus` is the chrome.storage.local stand-in for the Focus scripts
+// (settings, AI filter settings, AI lists, learned words); `app` holds the app-only options.
 
 const configPath = () => path.join(app.getPath('userData'), 'config.json');
-let config = { filter: sanitizeSettings({}), focus: {}, window: {}, alwaysOnTop: false, shields: true, quality: 'auto' };
+let config = { app: sanitizeApp({}), focus: {}, window: {}, alwaysOnTop: false, shields: true, quality: 'auto' };
 
 async function loadConfig() {
   try {
     const raw = JSON.parse(await readFile(configPath(), 'utf8'));
+    const focus = raw.focus && typeof raw.focus === 'object' && !Array.isArray(raw.focus) ? raw.focus : {};
+    let appRaw = raw.app;
+    // Older versions had their own built-in filter (config.filter): carry its settings over once.
+    if (raw.filter && typeof raw.filter === 'object' && !raw.app) {
+      const m = migrateOldFilter(raw.filter);
+      if (focus.aiFilterSettings === undefined) focus.aiFilterSettings = m.aiFilterSettings;
+      for (const [k, v] of Object.entries(m.focus)) if (focus[k] === undefined) focus[k] = v;
+      appRaw = m.app;
+    }
     config = {
-      filter: sanitizeSettings(raw.filter),
-      focus: raw.focus && typeof raw.focus === 'object' && !Array.isArray(raw.focus) ? raw.focus : {},
+      app: sanitizeApp(appRaw),
+      focus,
       window: raw.window && typeof raw.window === 'object' ? raw.window : {},
       alwaysOnTop: raw.alwaysOnTop === true,
       wideReset: raw.wideReset === true,
       quality: QUALITIES.some((q) => q.id === raw.quality) ? raw.quality : 'auto',
       shields: raw.shields !== false,
     };
+    if (raw.filter) saveConfig();
   } catch {
     // first run or unreadable file: keep defaults
   }
 }
 
+// Writes are debounced (the AI lists can be large and change often), serialised and atomic
+// so a crash can't leave a half-written file. flushConfigSync() runs on quit.
 let saveChain = Promise.resolve();
+let saveTimer = null;
 function saveConfig() {
-  // Serialise writes and write atomically so a crash can't leave a half-written file.
-  saveChain = saveChain
-    .then(async () => {
-      const tmp = configPath() + '.tmp';
-      await writeFile(tmp, JSON.stringify(config, null, 2));
-      await rename(tmp, configPath());
-    })
-    .catch((err) => console.error('Failed to save config', err));
-  return saveChain;
+  if (!saveTimer) {
+    saveTimer = setTimeout(() => {
+      saveTimer = null;
+      const json = JSON.stringify(config);
+      saveChain = saveChain
+        .then(async () => {
+          const tmp = configPath() + '.tmp';
+          await writeFile(tmp, json);
+          await rename(tmp, configPath());
+        })
+        .catch((err) => console.error('Failed to save config', err));
+    }, 400);
+  }
+  return Promise.resolve();
+}
+
+function flushConfigSync() {
+  if (!saveTimer) return;
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  try {
+    const tmp = configPath() + '.tmp';
+    writeFileSync(tmp, JSON.stringify(config));
+    renameSync(tmp, configPath());
+  } catch (err) {
+    console.error('Failed to save config', err);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +148,7 @@ let defaultUA = '';
 // Earlier versions turned on YouTube's theater mode via its "wide" cookie. Clear it once,
 // before any page loads, so YouTube renders its normal layout from the first frame.
 async function resetTheaterCookieOnce() {
-  if (config.wideReset || config.filter.playerSize !== 'default') return;
+  if (config.wideReset) return;
   try {
     const ses = session.fromPartition(PARTITION);
     for (const c of await ses.cookies.get({ name: 'wide' })) {
@@ -305,7 +338,6 @@ async function takeResumeUrl() {
   return null;
 }
 let settingsWin = null;
-let focusWin = null;
 
 function preloadPath(name) {
   return path.join(here, 'dist', name);
@@ -398,18 +430,20 @@ function openSettings() {
     return;
   }
   settingsWin = new BrowserWindow({
-    width: 780,
+    width: 900,
     height: 860,
-    minWidth: 420,
-    title: 'AI Filter Settings',
+    minWidth: 480,
+    title: 'Settings',
     icon: iconPath(),
     autoHideMenuBar: true,
     backgroundColor: '#0f0f10',
     webPreferences: {
-      preload: preloadPath('preload-settings.cjs'),
+      preload: preloadPath('preload-focus-settings.cjs'),
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
+      // The AI Filter / AI Lists / blocked-channels panes are embedded frames that need the same shim.
+      nodeIntegrationInSubFrames: true,
     },
   });
   settingsWin.setMenuBarVisibility(false);
@@ -419,37 +453,7 @@ function openSettings() {
   });
   settingsWin.webContents.on('will-navigate', (e) => e.preventDefault());
   settingsWin.on('closed', () => (settingsWin = null));
-  settingsWin.loadFile(path.join(here, 'dist', 'settings.html'));
-}
-
-function openFocusSettings() {
-  if (focusWin && !focusWin.isDestroyed()) {
-    focusWin.focus();
-    return;
-  }
-  focusWin = new BrowserWindow({
-    width: 900,
-    height: 860,
-    minWidth: 480,
-    title: 'Focus: layout, cleanup & audio',
-    icon: iconPath(),
-    autoHideMenuBar: true,
-    backgroundColor: '#0f0f10',
-    webPreferences: {
-      preload: preloadPath('preload-focus-settings.cjs'),
-      contextIsolation: true,
-      sandbox: true,
-      nodeIntegration: false,
-    },
-  });
-  focusWin.setMenuBarVisibility(false);
-  focusWin.webContents.setWindowOpenHandler(({ url }) => {
-    openExternal(url);
-    return { action: 'deny' };
-  });
-  focusWin.webContents.on('will-navigate', (e) => e.preventDefault());
-  focusWin.on('closed', () => (focusWin = null));
-  focusWin.loadFile(path.join(here, 'dist', 'focus-options', 'index.html'));
+  settingsWin.loadFile(path.join(here, 'dist', 'focus-options', 'index.html'));
 }
 
 function focusedYouTubeWindow() {
@@ -459,70 +463,137 @@ function focusedYouTubeWindow() {
 }
 
 // ---------------------------------------------------------------------------
-// Filter settings IPC
+// Settings IPC
 
 function isTrustedSender(frame) {
   if (!frame) return false;
   const url = frame.url || '';
-  if (url.startsWith('file://') && settingsWin && frame === settingsWin.webContents.mainFrame) return true;
-  if (url.startsWith('file://') && focusWin && frame === focusWin.webContents.mainFrame) return true;
+  if (url.startsWith('file://') && settingsWin && !settingsWin.isDestroyed()) {
+    return frame.top === settingsWin.webContents.mainFrame;
+  }
   return isYouTubeHost(hostOf(url)) && [...ytWindows].some((w) => w.webContents.mainFrame === frame);
 }
 
-async function setFilterSettings(next) {
-  config.filter = sanitizeSettings(next);
+/** Sends to every frame of every window (embedded settings frames included). */
+function broadcast(channel, payload) {
+  for (const w of BrowserWindow.getAllWindows()) {
+    if (w.isDestroyed()) continue;
+    for (const f of w.webContents.mainFrame.framesInSubtree) {
+      try {
+        f.send(channel, payload);
+      } catch {}
+    }
+  }
+}
+
+// chrome.storage.local stand-in for the Focus scripts, kept in config.focus.
+function focusGet(keys) {
+  if (keys == null) return { ...config.focus };
+  const list = typeof keys === 'string' ? [keys] : Array.isArray(keys) ? keys : Object.keys(keys);
+  const out = {};
+  for (const k of list) if (Object.hasOwn(config.focus, k)) out[k] = config.focus[k];
+  return out;
+}
+
+async function focusSet(obj, maxSize = Infinity) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
+  const changes = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (k === '__proto__' || JSON.stringify(v ?? null).length > maxSize) continue;
+    changes[k] = { oldValue: config.focus[k], newValue: v };
+    config.focus[k] = v;
+  }
   await saveConfig();
-  for (const w of BrowserWindow.getAllWindows()) w.webContents.send('aif:changed', config.filter);
+  broadcast('focus:changed', changes);
+  if (changes.aiFilterSettings) buildMenu();
+}
+
+async function focusRemove(keys) {
+  const changes = {};
+  for (const k of typeof keys === 'string' ? [keys] : Array.isArray(keys) ? keys : []) {
+    if (!Object.hasOwn(config.focus, k)) continue;
+    changes[k] = { oldValue: config.focus[k] };
+    delete config.focus[k];
+  }
+  await saveConfig();
+  broadcast('focus:changed', changes);
+}
+
+// Focus's background script (AI lists, learned words, archive, backups) runs here.
+let background = null;
+function startFocusBackground() {
+  const file = path.join(here, 'dist', 'focus-background.js');
+  try {
+    background = startBackground({
+      source: readFileSync(file, 'utf8'),
+      storage: {
+        get: async (keys) => focusGet(keys),
+        set: (obj) => focusSet(obj),
+        remove: (keys) => focusRemove(keys),
+      },
+    });
+  } catch (err) {
+    console.error('Focus background failed to start', err);
+  }
+}
+
+const appSettings = () => ({ ...config.app, shields: config.shields });
+
+async function setAppSettings(patch) {
+  if (!patch || typeof patch !== 'object') return;
+  const { shields, ...rest } = patch;
+  config.app = sanitizeApp({ ...config.app, ...rest });
+  await saveConfig();
+  if (typeof shields === 'boolean' && shields !== config.shields) setShields(shields);
+  broadcast('app:changed', appSettings());
   buildMenu();
 }
 
-function setupIpc() {
-  // Focus settings (focus/): a chrome.storage.local stand-in kept in config.focus.
-  const pickFocus = (keys) => {
-    if (keys == null) return { ...config.focus };
-    const list = typeof keys === 'string' ? [keys] : Array.isArray(keys) ? keys : Object.keys(keys);
-    const out = {};
-    for (const k of list) if (Object.hasOwn(config.focus, k)) out[k] = config.focus[k];
-    return out;
+// AI filter settings as the menu needs them (Focus's defaults apply until it saves its own).
+function aiFilter() {
+  const s = config.focus.aiFilterSettings && typeof config.focus.aiFilterSettings === 'object' ? config.focus.aiFilterSettings : {};
+  return {
+    enabled: s.enabled !== false,
+    mode: s.mode === 'blur' ? 'blur' : 'hide',
+    aiTopics: s.packs?.aiTopics === true,
+    blocked: (s.blockedChannels?.length || 0) + (s.aiChannels?.length || 0),
   };
-  const broadcastFocus = (changes) => {
-    for (const w of BrowserWindow.getAllWindows()) w.webContents.send('focus:changed', changes);
+}
+
+function aiFilterOp(op) {
+  return background?.dispatch({ type: 'aif:update', op });
+}
+
+function setupIpc() {
+  startFocusBackground();
+  const guard = (e) => {
+    if (!isTrustedSender(e.senderFrame)) throw new Error('untrusted sender');
   };
   ipcMain.handle('focus:get', (e, keys) => {
-    if (!isTrustedSender(e.senderFrame)) throw new Error('untrusted sender');
-    return pickFocus(keys);
+    guard(e);
+    return focusGet(keys);
   });
-  ipcMain.handle('focus:set', async (e, obj) => {
-    if (!isTrustedSender(e.senderFrame)) throw new Error('untrusted sender');
-    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
-    const changes = {};
-    for (const [k, v] of Object.entries(obj)) {
-      if (k === '__proto__' || JSON.stringify(v ?? null).length > 200_000) continue;
-      changes[k] = { oldValue: config.focus[k], newValue: v };
-      config.focus[k] = v;
-    }
-    await saveConfig();
-    broadcastFocus(changes);
+  ipcMain.handle('focus:set', (e, obj) => {
+    guard(e);
+    return focusSet(obj, 2_000_000);
   });
-  ipcMain.handle('focus:remove', async (e, keys) => {
-    if (!isTrustedSender(e.senderFrame)) throw new Error('untrusted sender');
-    const changes = {};
-    for (const k of typeof keys === 'string' ? [keys] : Array.isArray(keys) ? keys : []) {
-      if (!Object.hasOwn(config.focus, k)) continue;
-      changes[k] = { oldValue: config.focus[k] };
-      delete config.focus[k];
-    }
-    await saveConfig();
-    broadcastFocus(changes);
+  ipcMain.handle('focus:remove', (e, keys) => {
+    guard(e);
+    return focusRemove(keys);
+  });
+  ipcMain.handle('focus:message', (e, msg) => {
+    guard(e);
+    if (!msg || typeof msg.type !== 'string' || !background) return undefined;
+    return background.dispatch(msg);
   });
 
-  ipcMain.handle('aif:load', (e) => {
-    if (!isTrustedSender(e.senderFrame)) throw new Error('untrusted sender');
-    return config.filter;
+  ipcMain.handle('app:load', (e) => {
+    guard(e);
+    return appSettings();
   });
-  ipcMain.handle('aif:save', async (e, next) => {
-    if (!isTrustedSender(e.senderFrame)) throw new Error('untrusted sender');
-    await setFilterSettings(next);
+  ipcMain.handle('app:save', (e, patch) => {
+    guard(e);
+    return setAppSettings(patch);
   });
 
   // Whether the page-start ad pruning (core/adprune.js) should run: tied to Shields.
@@ -564,15 +635,14 @@ function withWc(fn) {
 }
 
 function buildMenu() {
-  const f = config.filter;
+  const f = aiFilter();
   const template = [
     ...(isMac ? [{ role: 'appMenu' }] : []),
     {
       label: '&File',
       submenu: [
         { label: 'New Window', accelerator: 'CmdOrCtrl+N', click: () => createYouTubeWindow() },
-        { label: 'AI Filter Settings…', accelerator: 'CmdOrCtrl+,', click: openSettings },
-        { label: 'Focus Settings (layout, cleanup, audio)…', accelerator: 'CmdOrCtrl+Shift+,', click: openFocusSettings },
+        { label: 'Settings…', accelerator: 'CmdOrCtrl+,', click: openSettings },
         { type: 'separator' },
         isMac ? { role: 'close' } : { role: 'quit' },
       ],
@@ -628,14 +698,14 @@ function buildMenu() {
         {
           label: 'Skip Video Ads',
           type: 'checkbox',
-          checked: config.filter.skipAds,
-          click: () => setFilterSettings({ ...config.filter, skipAds: !config.filter.skipAds }),
+          checked: config.app.skipAds,
+          click: () => setAppSettings({ skipAds: !config.app.skipAds }),
         },
         {
           label: 'Skip Sponsor Segments',
           type: 'checkbox',
-          checked: config.filter.skipSponsors,
-          click: () => setFilterSettings({ ...config.filter, skipSponsors: !config.filter.skipSponsors }),
+          checked: config.app.skipSponsors,
+          click: () => setAppSettings({ skipSponsors: !config.app.skipSponsors }),
         },
         { type: 'separator' },
         { label: listsStatusLabel(), enabled: false },
@@ -654,20 +724,20 @@ function buildMenu() {
           type: 'checkbox',
           checked: f.enabled,
           accelerator: 'CmdOrCtrl+Shift+F',
-          click: () => setFilterSettings({ ...config.filter, enabled: !config.filter.enabled }),
+          click: () => aiFilterOp({ op: 'patch', patch: { enabled: !f.enabled } }),
         },
         { type: 'separator' },
         {
           label: 'Hide Matching Videos',
           type: 'radio',
           checked: f.mode === 'hide',
-          click: () => setFilterSettings({ ...config.filter, mode: 'hide' }),
+          click: () => aiFilterOp({ op: 'patch', patch: { mode: 'hide' } }),
         },
         {
           label: 'Blur Matching Videos',
           type: 'radio',
           checked: f.mode === 'blur',
-          click: () => setFilterSettings({ ...config.filter, mode: 'blur' }),
+          click: () => aiFilterOp({ op: 'patch', patch: { mode: 'blur' } }),
         },
         { type: 'separator' },
         {
@@ -678,22 +748,18 @@ function buildMenu() {
         {
           label: 'Block Shorts',
           type: 'checkbox',
-          checked: f.hideShorts,
-          click: () => setFilterSettings({ ...config.filter, hideShorts: !config.filter.hideShorts }),
+          checked: config.app.hideShorts,
+          click: () => setAppSettings({ hideShorts: !config.app.hideShorts }),
         },
         {
           label: 'Hide AI News && Hype Too',
           type: 'checkbox',
-          checked: f.packs.aiTopics,
-          click: () =>
-            setFilterSettings({
-              ...config.filter,
-              packs: { ...config.filter.packs, aiTopics: !config.filter.packs.aiTopics },
-            }),
+          checked: f.aiTopics,
+          click: () => aiFilterOp({ op: 'setPack', id: 'aiTopics', on: !f.aiTopics }),
         },
         { type: 'separator' },
         {
-          label: `Blocked Channels (${f.blockedChannels.length})…`,
+          label: `Blocked Channels (${f.blocked})…`,
           click: openSettings,
         },
         { label: 'Settings…', click: openSettings },
@@ -702,18 +768,6 @@ function buildMenu() {
     {
       label: 'V&ideo',
       submenu: [
-        { label: 'Player Size', enabled: false },
-        ...[
-          ['default', 'Normal'],
-          ['theater', 'Theater (wide)'],
-          ['fit', 'Fit to Window'],
-        ].map(([id, label]) => ({
-          label: `   ${label}`,
-          type: 'radio',
-          checked: f.playerSize === id,
-          click: () => setFilterSettings({ ...config.filter, playerSize: id }),
-        })),
-        { type: 'separator' },
         { label: 'Quality', enabled: false },
         ...QUALITIES.map((q) => ({
           label: `   ${q.label}`,
@@ -815,4 +869,5 @@ if (!app.requestSingleInstanceLock()) {
   app.on('window-all-closed', () => {
     if (!isMac) app.quit();
   });
+  app.on('will-quit', flushConfigSync);
 }

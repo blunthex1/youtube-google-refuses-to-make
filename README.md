@@ -37,14 +37,16 @@ The app isn't code-signed yet, so Windows SmartScreen will warn on first launch:
 | `Ctrl+Shift+C` | Copy the current page link |
 | `Ctrl+Shift+F` | Turn the AI filter on/off |
 | `Ctrl+Shift+B` | Block the channel you're watching |
-| `Ctrl+,` | AI filter settings |
+| `Ctrl+,` | Settings |
+
+The app has a single **Settings** window (`Ctrl+,`). It is the embedded Focus for YouTube options page, with its layout, player, hide, channels, audio and backup panes, plus the full **AI Filter** (keyword packs, blocked/allowed channels, possibly-AI review, hover block, bars, skip old videos), **AI Lists** (AI channels, archive, learned words) and an **App** pane (shields, skip ads, SponsorBlock, hide Shorts/Playables). Old filter settings are migrated automatically on first run.
 | `Ctrl+Shift+T` | Always on top |
 | `F11` | Full screen |
 | `Ctrl+N` | New window |
 
 - Links to other sites open in your normal browser. YouTube and Google sign-in stay in the app.
 - You can launch it with a URL (`YGRTM.exe https://youtu.be/...`) to open that video.
-- **File → Focus Settings** (`Ctrl+Shift+,`) holds the layout, clean-up and audio-leveling options ported from the Focus for YouTube extension (everything is off until you turn it on). Its code lives in `focus/`.
+- **File → Settings** (`Ctrl+,`) is the single settings window: Focus's layout, player, hide, channels, audio, AI filter and AI lists (with word learning) tabs, plus an **App** tab for ad blocking and the other desktop-only options. Focus code lives in `focus/`.
 - To uninstall, use Windows **Settings → Apps → Installed apps** (or the Start menu's uninstall entry). The installer version also deletes the app's saved settings and sign-in. The portable `.exe` has no uninstaller; just delete it and `%APPDATA%\YouTube Google Refuses To Make`.
 - Settings are stored in `%APPDATA%\YouTube Google Refuses To Make\config.json`.
 
