@@ -21,7 +21,7 @@ export function makeChrome() {
         set: (obj) => ipcRenderer.invoke('focus:set', obj),
         remove: (keys) => ipcRenderer.invoke('focus:remove', keys),
       },
-      onChanged: { addListener: (fn) => listeners.add(fn) },
+      onChanged: { addListener: (fn) => void listeners.add(fn) },
     },
     runtime: {
       id: 'ygrtm-app',

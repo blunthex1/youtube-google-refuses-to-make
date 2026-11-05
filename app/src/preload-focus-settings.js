@@ -3,4 +3,5 @@
 import { contextBridge } from 'electron';
 import { makeChrome } from './focus-chrome.js';
 
-contextBridge.exposeInMainWorld('chrome', makeChrome());
+// window.chrome already exists in Chromium, so expose under another name; shim.js merges it.
+contextBridge.exposeInMainWorld('ygrtmChrome', makeChrome());

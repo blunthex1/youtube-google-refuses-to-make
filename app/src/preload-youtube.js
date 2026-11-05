@@ -16,7 +16,6 @@ import { makeChrome } from './focus-chrome.js';
 try {
   globalThis.chrome = makeChrome();
   webFrame.insertCSS(focusCss);
-  webFrame.executeJavaScript(focusPageSource).catch(() => {});
   const whenRoot = (fn) => {
     if (document.documentElement) return fn();
     const mo = new MutationObserver(() => {
@@ -26,6 +25,8 @@ try {
     });
     mo.observe(document, { childList: true });
   };
+  // The page script reads document.documentElement immediately, so wait for it.
+  whenRoot(() => webFrame.executeJavaScript(focusPageSource).catch(() => {}));
   whenRoot(runEarly);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', runAudio, { once: true });
   else runAudio();
