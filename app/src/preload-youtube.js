@@ -5,6 +5,33 @@ import { contextBridge, ipcRenderer, webFrame } from 'electron';
 import css from '../../core/filter.css';
 import { createFilter } from '../../core/engine.js';
 import { installAdPrune } from '../../core/adprune.js';
+import focusCss from '../../focus/styles.css';
+import focusPageSource from '../../focus/page.js.txt';
+import { runEarly } from '../../focus/early.js';
+import { runAudio } from '../../focus/audio.js';
+import { makeChrome } from './focus-chrome.js';
+
+// Focus layout/cleanup/audio scripts (see focus/). They are off until enabled in
+// Focus settings, and share nothing with the AI filter below.
+try {
+  globalThis.chrome = makeChrome();
+  webFrame.insertCSS(focusCss);
+  webFrame.executeJavaScript(focusPageSource).catch(() => {});
+  const whenRoot = (fn) => {
+    if (document.documentElement) return fn();
+    const mo = new MutationObserver(() => {
+      if (!document.documentElement) return;
+      mo.disconnect();
+      fn();
+    });
+    mo.observe(document, { childList: true });
+  };
+  whenRoot(runEarly);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', runAudio, { once: true });
+  else runAudio();
+} catch (err) {
+  console.error('YGRTM: Focus scripts not installed', err);
+}
 
 const storage = {
   load: () => ipcRenderer.invoke('aif:load'),

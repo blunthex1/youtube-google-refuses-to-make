@@ -44,6 +44,7 @@ The app isn't code-signed yet, so Windows SmartScreen will warn on first launch:
 
 - Links to other sites open in your normal browser. YouTube and Google sign-in stay in the app.
 - You can launch it with a URL (`YGRTM.exe https://youtu.be/...`) to open that video.
+- **File → Focus Settings** (`Ctrl+Shift+,`) holds the layout, clean-up and audio-leveling options ported from the Focus for YouTube extension (everything is off until you turn it on). Its code lives in `focus/`.
 - To uninstall, use Windows **Settings → Apps → Installed apps** (or the Start menu's uninstall entry). The installer version also deletes the app's saved settings and sign-in. The portable `.exe` has no uninstaller; just delete it and `%APPDATA%\YouTube Google Refuses To Make`.
 - Settings are stored in `%APPDATA%\YouTube Google Refuses To Make\config.json`.
 

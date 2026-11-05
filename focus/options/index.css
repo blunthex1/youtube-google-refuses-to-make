@@ -1,0 +1,55 @@
+:root { color-scheme: light dark; --bg: #fff; --fg: #0f0f0f; --muted: #606060; --card: #f2f2f2; --line: #ddd; --accent: #065fd4; }
+@media (prefers-color-scheme: dark) { :root { --bg: #0f0f0f; --fg: #f1f1f1; --muted: #aaa; --card: #212121; --line: #333; --accent: #3ea6ff; } }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 360px; background: var(--bg); color: var(--fg); font: 14px/1.4 Roboto, Arial, sans-serif; }
+header { display: flex; align-items: baseline; gap: 8px; padding: 12px 16px 6px; }
+h1 { font-size: 16px; margin: 0; }
+#version, #saved { color: var(--muted); font-size: 12px; }
+#saved { margin-left: auto; color: var(--accent); }
+nav { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 12px 8px; border-bottom: 1px solid var(--line); }
+nav button { border: 0; background: none; color: var(--muted); padding: 6px 10px; border-radius: 16px; cursor: pointer; font: inherit; }
+nav button[aria-selected='true'] { background: var(--card); color: var(--fg); font-weight: 600; }
+main { padding: 8px 12px 16px; }
+.pane[hidden] { display: none; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 4px; border-bottom: 1px solid var(--line); }
+.row:last-child { border-bottom: 0; }
+.row label { flex: 1; cursor: pointer; }
+select { background: var(--card); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; font: inherit; }
+input[type='checkbox'] { appearance: none; width: 36px; height: 20px; border-radius: 10px; background: var(--line); position: relative; cursor: pointer; flex: none; transition: background .15s; }
+input[type='checkbox']::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .15s; }
+input[type='checkbox']:checked { background: var(--accent); }
+input[type='checkbox']:checked::after { left: 18px; }
+iframe { width: 100%; border: 0; min-height: 400px; background: transparent; }
+.backup p { color: var(--muted); }
+.backup button { background: var(--card); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; margin: 4px 6px 4px 0; cursor: pointer; font: inherit; }
+.backup .msg { margin-top: 8px; font-size: 13px; }
+/* The AI Filter and Sponsor Skip pages read these to match the page they're shown in (same names as ImprovedTube's
+   menu, where they were shown before). */
+body { --satus-primary: var(--accent); --satus-section-background: var(--card); --satus-section-foreground: var(--fg); --satus-base-foreground: var(--fg); --satus-section-border: var(--line); --satus-text-field-background: var(--bg); }
+
+/* As the toolbar popup: one fixed size. Brave sizes a popup to its content, so it used to resize (and the tabs rewrap)
+   on every tab; now the header and tabs stay put and only the tab's content scrolls. */
+html.popup, html.popup body { width: 390px; height: 580px; overflow: hidden; }
+html.popup body { display: flex; flex-direction: column; min-width: 0; }
+html.popup header, html.popup nav { flex: none; }
+html.popup main { flex: 1; overflow-y: auto; }
+
+.row.col { flex-direction: column; align-items: stretch; gap: 6px; }
+.slider-out { color: var(--accent); font-weight: 600; }
+input[type='range'] { width: 100%; accent-color: var(--accent); }
+
+.group-title { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 18px 4px 2px; }
+.group-title:first-child { margin-top: 4px; }
+
+.backup-learn { display: block; margin: 8px 0; cursor: pointer; }
+
+.diag { margin-top: 22px; padding-top: 14px; border-top: 1px solid rgba(128,128,128,.3); }
+.diag h3 { margin: 0 0 6px; font-size: 15px; }
+.diag p { margin: 0 0 8px; font-size: 13px; opacity: .8; }
+.diag-list { max-height: 240px; overflow-y: auto; margin-bottom: 8px; }
+.diag-item { padding: 6px 8px; margin-bottom: 4px; border-radius: 8px; background: rgba(128,128,128,.14); font-size: 12px; }
+.diag-head { opacity: .75; }
+.diag-msg { margin-top: 2px; word-break: break-word; }
+.diag-empty { font-style: italic; }
+.diag-trace { width: 100%; box-sizing: border-box; font: 11px/1.4 ui-monospace, Consolas, monospace; margin-bottom: 6px; background: transparent; color: inherit; border: 1px solid rgba(128,128,128,.4); border-radius: 6px; padding: 6px; }
+.diag-trace-box[hidden] { display: none; }

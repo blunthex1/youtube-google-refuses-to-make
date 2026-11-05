@@ -26,13 +26,14 @@ const SIGN_IN_UA = isMac
 // Persistent config (filter settings + window state)
 
 const configPath = () => path.join(app.getPath('userData'), 'config.json');
-let config = { filter: sanitizeSettings({}), window: {}, alwaysOnTop: false, shields: true, quality: 'auto' };
+let config = { filter: sanitizeSettings({}), focus: {}, window: {}, alwaysOnTop: false, shields: true, quality: 'auto' };
 
 async function loadConfig() {
   try {
     const raw = JSON.parse(await readFile(configPath(), 'utf8'));
     config = {
       filter: sanitizeSettings(raw.filter),
+      focus: raw.focus && typeof raw.focus === 'object' && !Array.isArray(raw.focus) ? raw.focus : {},
       window: raw.window && typeof raw.window === 'object' ? raw.window : {},
       alwaysOnTop: raw.alwaysOnTop === true,
       wideReset: raw.wideReset === true,
@@ -281,6 +282,7 @@ function setQuality(id) {
 
 const ytWindows = new Set();
 let settingsWin = null;
+let focusWin = null;
 
 function preloadPath(name) {
   return path.join(here, 'dist', name);
@@ -397,6 +399,36 @@ function openSettings() {
   settingsWin.loadFile(path.join(here, 'dist', 'settings.html'));
 }
 
+function openFocusSettings() {
+  if (focusWin && !focusWin.isDestroyed()) {
+    focusWin.focus();
+    return;
+  }
+  focusWin = new BrowserWindow({
+    width: 900,
+    height: 860,
+    minWidth: 480,
+    title: 'Focus: layout, cleanup & audio',
+    icon: iconPath(),
+    autoHideMenuBar: true,
+    backgroundColor: '#0f0f10',
+    webPreferences: {
+      preload: preloadPath('preload-focus-settings.cjs'),
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+    },
+  });
+  focusWin.setMenuBarVisibility(false);
+  focusWin.webContents.setWindowOpenHandler(({ url }) => {
+    openExternal(url);
+    return { action: 'deny' };
+  });
+  focusWin.webContents.on('will-navigate', (e) => e.preventDefault());
+  focusWin.on('closed', () => (focusWin = null));
+  focusWin.loadFile(path.join(here, 'dist', 'focus-options', 'index.html'));
+}
+
 function focusedYouTubeWindow() {
   const w = BrowserWindow.getFocusedWindow();
   if (w && ytWindows.has(w)) return w;
@@ -410,6 +442,7 @@ function isTrustedSender(frame) {
   if (!frame) return false;
   const url = frame.url || '';
   if (url.startsWith('file://') && settingsWin && frame === settingsWin.webContents.mainFrame) return true;
+  if (url.startsWith('file://') && focusWin && frame === focusWin.webContents.mainFrame) return true;
   return isYouTubeHost(hostOf(url)) && [...ytWindows].some((w) => w.webContents.mainFrame === frame);
 }
 
@@ -421,6 +454,45 @@ async function setFilterSettings(next) {
 }
 
 function setupIpc() {
+  // Focus settings (focus/): a chrome.storage.local stand-in kept in config.focus.
+  const pickFocus = (keys) => {
+    if (keys == null) return { ...config.focus };
+    const list = typeof keys === 'string' ? [keys] : Array.isArray(keys) ? keys : Object.keys(keys);
+    const out = {};
+    for (const k of list) if (Object.hasOwn(config.focus, k)) out[k] = config.focus[k];
+    return out;
+  };
+  const broadcastFocus = (changes) => {
+    for (const w of BrowserWindow.getAllWindows()) w.webContents.send('focus:changed', changes);
+  };
+  ipcMain.handle('focus:get', (e, keys) => {
+    if (!isTrustedSender(e.senderFrame)) throw new Error('untrusted sender');
+    return pickFocus(keys);
+  });
+  ipcMain.handle('focus:set', async (e, obj) => {
+    if (!isTrustedSender(e.senderFrame)) throw new Error('untrusted sender');
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
+    const changes = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (k === '__proto__' || JSON.stringify(v ?? null).length > 200_000) continue;
+      changes[k] = { oldValue: config.focus[k], newValue: v };
+      config.focus[k] = v;
+    }
+    await saveConfig();
+    broadcastFocus(changes);
+  });
+  ipcMain.handle('focus:remove', async (e, keys) => {
+    if (!isTrustedSender(e.senderFrame)) throw new Error('untrusted sender');
+    const changes = {};
+    for (const k of typeof keys === 'string' ? [keys] : Array.isArray(keys) ? keys : []) {
+      if (!Object.hasOwn(config.focus, k)) continue;
+      changes[k] = { oldValue: config.focus[k] };
+      delete config.focus[k];
+    }
+    await saveConfig();
+    broadcastFocus(changes);
+  });
+
   ipcMain.handle('aif:load', (e) => {
     if (!isTrustedSender(e.senderFrame)) throw new Error('untrusted sender');
     return config.filter;
@@ -477,6 +549,7 @@ function buildMenu() {
       submenu: [
         { label: 'New Window', accelerator: 'CmdOrCtrl+N', click: () => createYouTubeWindow() },
         { label: 'AI Filter Settings…', accelerator: 'CmdOrCtrl+,', click: openSettings },
+        { label: 'Focus Settings (layout, cleanup, audio)…', accelerator: 'CmdOrCtrl+Shift+,', click: openFocusSettings },
         { type: 'separator' },
         isMac ? { role: 'close' } : { role: 'quit' },
       ],

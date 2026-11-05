@@ -1,0 +1,723 @@
+(() => {
+  // src/youtube/dom.js
+  var YT = {
+    // pages
+    watchFlexy: "ytd-watch-flexy",
+    //                         ImprovedTube: elements.ytd_watch
+    player: "#movie_player",
+    //                                ImprovedTube: elements.player
+    playerVideo: "#movie_player video",
+    theaterButton: "#movie_player button.ytp-size-button",
+    //  ImprovedTube: appearance.js forcedTheaterMode
+    // attributes YouTube sets on ytd-watch-flexy when theater mode is on
+    theaterAttrs: ["theater", "full-bleed-player"],
+    fullBleedBox: "#full-bleed-container",
+    //                  the box the player fills in theater mode
+    // YouTube's own navigation events (single-page app)
+    navigateStart: "yt-navigate-start",
+    navigateFinish: "yt-navigate-finish",
+    pageDataUpdated: "yt-page-data-updated",
+    // the up-next autoplay switch, in the markups YouTube uses        ImprovedTube: player.js upNextAutoplay
+    autonavToggle: 'button.ytp-autonav-toggle, .ytp-autonav-toggle-button-container, .ytp-autonav-toggle-button, [data-tooltip-target-id="ytp-autonav-toggle-button"]',
+    playlistPanel: "ytd-playlist-panel-renderer",
+    playlistItems: "ytd-playlist-panel-renderer #items",
+    playlistSelected: "ytd-playlist-panel-renderer ytd-playlist-panel-video-renderer[selected]",
+    playlistLinks: "ytd-playlist-panel-renderer ytd-playlist-panel-video-renderer a#wc-endpoint",
+    // the playlist header's button row (Repeat, Shuffle): the Reverse button goes right after its last button
+    playlistButtonRow: [
+      "ytd-playlist-panel-renderer #playlist-action-menu #top-level-buttons-computed",
+      "ytd-playlist-panel-renderer #top-level-buttons-computed",
+      "ytd-playlist-panel-renderer #playlist-action-menu ytd-menu-renderer"
+    ],
+    playlistRowButtons: "ytd-toggle-button-renderer, ytd-playlist-loop-button-renderer, yt-button-shape, ytd-button-renderer, button",
+    // fallback spots if that row isn't found, first match wins (ImprovedTube: playlist.js injectReverseButton)
+    playlistButtonSpots: [
+      "ytd-playlist-panel-renderer #playlist-action-menu",
+      ".ytd-playlist-panel-renderer #playlist-action-menu",
+      "#playlist-action-menu",
+      "ytd-playlist-panel-renderer #header-description",
+      "ytd-menu-renderer.ytd-playlist-panel-renderer",
+      "ytd-playlist-panel-renderer #top-level-buttons-computed",
+      "ytd-playlist-header-renderer #playlist-action-menu"
+    ],
+    adShowing: ".html5-video-player.ad-showing",
+    mainVideo: ".html5-main-video, .video-stream",
+    masthead: "ytd-masthead",
+    // live streams in theater mode: YouTube's "fixed panels" layout pins the chat to the screen beside the player
+    fixedPanelsFlexy: "ytd-watch-flexy[fixed-panels]",
+    pinnedChatCandidates: ["#panels-full-bleed-container", "#chat-container", "ytd-live-chat-frame#chat", "#secondary #chat"],
+    // where the upload date is shown under a video (ImprovedTube: appearance.js dayOfWeek)
+    uploadDateJson: "#microformat script",
+    uploadDateMeta: "[itemprop=datePublished]",
+    infoStrings: ["#info span:nth-child(2)", "#info #info-strings yt-formatted-string"],
+    // side panels (ImprovedTube: extension/appearance/sidebar/sidebar.js sidePanels)
+    sidePanel: "#secondary #panels > *",
+    sidePanelClose: '#secondary #panels > * button[aria-label="Close"], #playlist button[aria-label="Close"]',
+    sidePanelHeader: "#secondary #panels > * #header, #secondary #panels > * #header-container, #secondary #panels > * #title, #playlist #header-container, #playlist #title",
+    // YouTube remembers theater mode in this cookie and starts in theater mode when it's set
+    theaterCookie: "wide=1"
+  };
+  var CHANNEL_ANY = /\/(@|c\/@?|channel\/|user\/)[^/]+/;
+  var CHANNEL_TAB = /\/(videos|shorts|playlists|community|channels|about|posts|streams|releases)\/?$/;
+  function isTheater(flexy) {
+    return !!flexy && (flexy.theater === true || YT.theaterAttrs.some((a) => flexy.hasAttribute(a)));
+  }
+
+  // src/page/enhance.js
+  var ITEMS = [
+    [(s3) => s3.stable_volume, /^stable volume/i],
+    [(s3) => s3.voice_boost, /^voice boost/i],
+    [(s3) => s3.ambient_lighting === false ? "off" : null, /^ambient mode/i],
+    [(s3) => s3.player_hide_annotations === true ? "off" : null, /^annotations/i]
+  ];
+  var wanted = (s3) => ITEMS.map(([get, re]) => [get(s3), re]).filter(([v]) => v === "on" || v === "off");
+  var menuOpen = (player) => {
+    const m = player.querySelector(".ytp-settings-menu, .ytp-popup.ytp-settings-menu");
+    return !!m && getComputedStyle(m).display !== "none" && m.offsetHeight > 0;
+  };
+  var find = (player, re) => [...player.querySelectorAll(".ytp-panel-menu .ytp-menuitem")].find((i) => re.test((i.querySelector(".ytp-menuitem-label")?.textContent || "").trim()));
+  var pressed = { href: "", keys: /* @__PURE__ */ new Set() };
+  var running = false;
+  function enhancements(player, s3) {
+    const todo = wanted(s3);
+    if (!todo.length || !player || player.dataset.itEnh === location.href || running) return;
+    running = true;
+    let tries = 0;
+    const root2 = document.documentElement;
+    const closeMenu = (gear, done) => {
+      if (menuOpen(player)) gear.click();
+      setTimeout(() => {
+        if (menuOpen(player)) {
+          player.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", keyCode: 27, bubbles: true }));
+          document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", keyCode: 27, bubbles: true }));
+        }
+        setTimeout(() => {
+          try {
+            gear.blur();
+            document.activeElement?.blur?.();
+          } catch {
+          }
+          for (const t of [gear, player]) for (const type of ["mouseout", "mouseleave"]) t.dispatchEvent(new MouseEvent(type, { bubbles: type === "mouseout" }));
+          root2.removeAttribute("it-menu-probe");
+          done();
+        }, 200);
+      }, 250);
+    };
+    const state2 = (item) => item.getAttribute("aria-checked") === "true";
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const log = (...a) => console.debug("[Focus for YouTube] switches:", ...a);
+    let busy = false;
+    const attempt = async () => {
+      if (busy) return;
+      const gear = player.querySelector(".ytp-settings-button");
+      if (!gear || menuOpen(player) || player.classList.contains("ad-showing")) return retry();
+      busy = true;
+      if (pressed.href !== location.href) {
+        pressed.href = location.href;
+        pressed.keys.clear();
+      }
+      root2.setAttribute("it-menu-probe", "");
+      gear.click();
+      await wait(450);
+      let ok = true;
+      for (const [value, re] of todo) {
+        const key = String(re);
+        let item = find(player, re);
+        if (!item) {
+          ok = false;
+          log(key, "not in the menu (yet)");
+          continue;
+        }
+        const want = value === "on";
+        if (state2(item) === want) continue;
+        if (pressed.keys.has(key)) {
+          log(key, "already pressed for this video; not pressing again");
+          continue;
+        }
+        pressed.keys.add(key);
+        item.click();
+        for (let i = 0; i < 40; i++) {
+          await wait(250);
+          item = find(player, re);
+          if (item && state2(item) === want) break;
+        }
+        if (!item || state2(item) !== want) log(key, "did not show", value, "after 10 s; leaving it");
+        else log(key, "switched", value);
+        if (!menuOpen(player)) {
+          if (todo.length > 1) {
+            gear.click();
+            await wait(450);
+          }
+        }
+      }
+      closeMenu(gear, () => {
+        busy = false;
+        if (ok || tries >= 4) {
+          player.dataset.itEnh = location.href;
+          running = false;
+        } else retry();
+      });
+    };
+    const retry = () => {
+      if (++tries <= 4) setTimeout(attempt, 3500);
+      else running = false;
+    };
+    let waited = 0;
+    const start = () => {
+      const v = player.querySelector("video");
+      if (v && v.readyState >= 2 || ++waited > 20) setTimeout(attempt, 800);
+      else setTimeout(start, 500);
+    };
+    setTimeout(start, 1e3);
+  }
+
+  // src/page/player.js
+  var LABELS = ["tiny", "small", "medium", "large", "hd720", "hd1080", "hd1440", "hd2160", "hd2880", "highres"];
+  var HEIGHTS = [144, 240, 360, 480, 720, 1080, 1440, 2160, 2880, 4320];
+  var isPlaylist = () => new URLSearchParams(location.search).has("list") || !!document.querySelector(YT.playlistPanel);
+  var isFullscreen = () => !!document.fullscreenElement;
+  function wantedQuality(s3, { hidden = document.visibilityState === "hidden" } = {}) {
+    if (isFullscreen() && s3.full_screen_quality) return s3.full_screen_quality;
+    if (hidden && s3.player_quality_without_focus && s3.player_quality_without_focus !== "auto") return s3.player_quality_without_focus;
+    if (isPlaylist() && s3.player_quality_playlist && s3.player_quality_playlist !== "disabled") return s3.player_quality_playlist;
+    return s3.player_quality;
+  }
+  var qualityLog = { href: "", count: 0, last: 0, quality: null };
+  function setQuality(player, quality) {
+    if (!quality || quality === "disabled" || quality === "auto" || !player?.getAvailableQualityLevels) return null;
+    const available = player.getAvailableQualityLevels() || [];
+    if (!available.length) return null;
+    const high = ["hd1080", "hd1440", "hd2160", "hd2880", "highres"];
+    if (!available.some((q) => high.includes(q)) && high.includes(quality)) quality = "hd720";
+    if (!available.includes(quality)) {
+      const want = HEIGHTS[LABELS.indexOf(quality)];
+      let best = null;
+      for (const q of available) {
+        const h = HEIGHTS[LABELS.indexOf(q)];
+        if (h && (best === null || Math.abs(h - want) < Math.abs(HEIGHTS[LABELS.indexOf(best)] - want))) best = q;
+      }
+      if (!best) return null;
+      quality = best;
+    }
+    if (player.dataset.itQuality === quality && player.getPlaybackQuality?.() === quality) return quality;
+    const now = Date.now();
+    if (qualityLog.href !== location.href) Object.assign(qualityLog, { href: location.href, count: 0, last: 0, quality: null });
+    if (qualityLog.quality === quality && now - qualityLog.last < 1e4) return quality;
+    if (qualityLog.count >= 6) return quality;
+    qualityLog.count++;
+    qualityLog.last = now;
+    qualityLog.quality = quality;
+    try {
+      player.setPlaybackQualityRange?.(quality, quality);
+      player.setPlaybackQuality?.(quality);
+    } catch {
+    }
+    player.dataset.itQuality = quality;
+    return quality;
+  }
+  function subtitles(player, s3) {
+    if (s3.player_subtitles !== "disabled" || !player) return;
+    let n = 0;
+    let offAt = 0;
+    const tick = () => {
+      try {
+        if (player.isSubtitlesOn?.()) {
+          player.toggleSubtitles?.();
+          offAt = Date.now();
+        }
+      } catch {
+      }
+      if (++n < 24 && !(offAt && Date.now() - offAt > 3e3)) setTimeout(tick, 500);
+    };
+    tick();
+  }
+  var autonavObserver = null;
+  var autonavTimer = null;
+  var autonavWant = null;
+  var autonavOn = (toggle) => {
+    const el = toggle.matches("[aria-checked]") ? toggle : toggle.querySelector("[aria-checked]");
+    if (el) return el.getAttribute("aria-checked") === "true";
+    const t = toggle.getAttribute("data-tooltip-title") || toggle.getAttribute("aria-label") || toggle.title || "";
+    return /\bon\b/i.test(t) ? true : /\boff\b/i.test(t) ? false : null;
+  };
+  function autonavSync() {
+    if (autonavWant === null) return;
+    const player = document.querySelector(YT.player);
+    try {
+      player?.setAutonav?.(autonavWant);
+    } catch {
+    }
+    const toggle = document.querySelector(YT.autonavToggle);
+    if (!toggle) return;
+    const on = autonavOn(toggle);
+    if (on !== null && on !== autonavWant) (toggle.closest("button") || toggle).click();
+  }
+  function upNextAutoplay(s3) {
+    autonavWant = s3.up_next_autoplay === true || s3.up_next_autoplay === false ? s3.up_next_autoplay : null;
+    clearInterval(autonavTimer);
+    if (autonavWant === null) return;
+    autonavSync();
+    let n = 0;
+    autonavTimer = setInterval(() => {
+      autonavSync();
+      if (++n >= 20) clearInterval(autonavTimer);
+    }, 500);
+    if (!autonavObserver) {
+      let pending = false;
+      autonavObserver = new MutationObserver(() => {
+        if (pending || autonavWant === null) return;
+        pending = true;
+        setTimeout(() => {
+          pending = false;
+          autonavSync();
+        }, 250);
+      });
+      autonavObserver.observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ["aria-checked", "data-tooltip-title"] });
+    }
+  }
+
+  // src/page/dubbing.js
+  var IT = { storage: {}, elements: { player: null } };
+  IT.getAudioTrackInfo = function(track) {
+    return track?.getLanguageInfo?.() || {};
+  };
+  IT.normalizeAudioTrackText = function(value) {
+    return String(value || "").trim().toLocaleLowerCase();
+  };
+  IT.audioTrackIsAutoDubbed = function(track) {
+    const info = this.getAudioTrackInfo(track);
+    const metadata = [track, info, track?.audioTrack, track?.audioTrackData, info?.audioTrack];
+    const autoFlags = [
+      "isAutoDubbed",
+      "isAutoDubbing",
+      "isAutomaticallyDubbed",
+      "autoDubbed",
+      "autoDubbing",
+      "isAutoGenerated",
+      "isMachineGenerated",
+      "isSynthetic"
+    ];
+    for (const source of metadata) {
+      if (!source || typeof source !== "object") continue;
+      if (autoFlags.some((flag) => source[flag] === true)) return true;
+    }
+    const descriptor = metadata.flatMap(function(source) {
+      if (!source || typeof source !== "object") return [];
+      return [source.id, source.name, source.languageCode, source.languageName, source.kind];
+    }).join(" ").toLocaleLowerCase();
+    if (/auto[\s_-]*dub|automatic[\s_-]*dub|machine[\s_-]*dub|synthetic[\s_-]*dub|generated[\s_-]*dub/.test(descriptor)) {
+      return true;
+    }
+    const autoLabels = this.autoDubbedTrackLabels;
+    const name = this.normalizeAudioTrackText(info.name || track?.languageName);
+    if (autoLabels && autoLabels.url === location.href && name) {
+      const labelMatchesTrack = (label) => label === name || label.startsWith(name + " ") || label.includes(name + " auto");
+      const appearsInAutoSection = Array.from(autoLabels.values).some(labelMatchesTrack);
+      const appearsInManualSection = Array.from(autoLabels.manualValues || []).some(labelMatchesTrack);
+      return appearsInAutoSection && !appearsInManualSection;
+    }
+    return false;
+  };
+  IT.audioTrackMatchesLanguage = function(track, language) {
+    const selected = this.normalizeAudioTrackText(language);
+    if (!selected) return false;
+    const info = this.getAudioTrackInfo(track);
+    const codes = [info.id, info.languageCode, track?.id, track?.languageCode].map(this.normalizeAudioTrackText).filter(Boolean);
+    const names = [info.name, info.languageName, track?.name, track?.languageName].map(this.normalizeAudioTrackText).filter(Boolean);
+    return codes.some((code) => code === selected || code.startsWith(selected + ".") || code.startsWith(selected + "-") || code.startsWith(selected + "_")) || names.some((name) => name === selected || name.includes(selected));
+  };
+  IT.findOriginalAudioTrack = function(audioTracks) {
+    if (!audioTracks?.length) return null;
+    const originalWords = ["original", "originale", "originalny", "originalaudio", "origineel", "orijinal", "\u043E\u0440\u0438\u0433\u0438\u043D\u0430\u043B", "\u043E\u0440\u0438\u0433\u0438\u043D\u0430\u043B\u044C\u043D\u0430\u044F"];
+    const isNamedOriginal = (track) => {
+      const name = this.normalizeAudioTrackText(this.getAudioTrackInfo(track).name);
+      return originalWords.some((word) => name.includes(word));
+    };
+    const hasAsrCaption = (track) => Array.isArray(track?.captionTracks) && track.captionTracks.some((caption) => caption.kind === "asr");
+    const isDefault = (track) => this.getAudioTrackInfo(track).isDefault === true || track?.isDefault === true;
+    return audioTracks.find((track) => track?.isOriginal === true || this.getAudioTrackInfo(track).isOriginal === true) || audioTracks.find(isNamedOriginal) || audioTracks.find(hasAsrCaption) || audioTracks.find(isDefault) || audioTracks[0];
+  };
+  IT.getPreferredAudioLanguage = function() {
+    const selected = this.storage.player_default_dubbed_language;
+    if (selected && selected !== "disabled") return selected;
+    return this.storage.preferred_dubbing_language || "";
+  };
+  IT.audioTracksAreEqual = function(firstTrack, secondTrack) {
+    if (firstTrack === secondTrack) return true;
+    const firstInfo = this.getAudioTrackInfo(firstTrack);
+    const secondInfo = this.getAudioTrackInfo(secondTrack);
+    const firstId = firstInfo.id || firstTrack?.id;
+    const secondId = secondInfo.id || secondTrack?.id;
+    return Boolean(firstId && secondId && firstId === secondId);
+  };
+  IT.selectPermittedAudioTrack = function(player, preferredLanguage) {
+    const tracks = player?.getAvailableAudioTracks?.();
+    if (!tracks?.length) return null;
+    const blockAutoDubbing = this.storage.disable_auto_dubbing === true;
+    const permittedTracks = blockAutoDubbing ? tracks.filter((track) => !this.audioTrackIsAutoDubbed(track)) : tracks;
+    const requestedLanguage = preferredLanguage || this.getPreferredAudioLanguage();
+    let targetTrack = requestedLanguage ? permittedTracks.find((track) => this.audioTrackMatchesLanguage(track, requestedLanguage)) : null;
+    if (!targetTrack && blockAutoDubbing) {
+      targetTrack = this.findOriginalAudioTrack(permittedTracks) || this.findOriginalAudioTrack(tracks);
+    }
+    const currentTrack = player.getAudioTrack?.();
+    if (targetTrack && !this.audioTracksAreEqual(currentTrack, targetTrack)) {
+      player.setAudioTrack(targetTrack);
+    }
+    return targetTrack || null;
+  };
+  IT.disableAutoDubbing = function() {
+    IT.stopAutoDubbingGuard = function() {
+      const guard2 = this.autoDubbingGuard;
+      if (!guard2) return;
+      clearInterval(guard2.interval);
+      guard2.video?.removeEventListener("loadedmetadata", guard2.forceSelection);
+      guard2.video?.removeEventListener("playing", guard2.enforce);
+      this.autoDubbingGuard = null;
+    };
+    IT.enforceAutoDubbingPolicy = function() {
+      const player = this.elements.player;
+      if (!player?.getAvailableAudioTracks) return;
+      if (this.autoDubbingGuard?.player !== player) this.stopAutoDubbingGuard();
+      if (!this.autoDubbingGuard) {
+        const video = player.querySelector?.("video");
+        const canReadCurrentTrack = typeof player.getAudioTrack === "function";
+        const guard2 = {
+          player,
+          video,
+          enforce: function() {
+            if (IT.storage.disable_auto_dubbing !== true || !canReadCurrentTrack) return;
+            const currentTrack = player.getAudioTrack();
+            if (currentTrack && IT.audioTrackIsAutoDubbed(currentTrack)) {
+              IT.selectPermittedAudioTrack(player);
+            }
+          },
+          forceSelection: function() {
+            setTimeout(function() {
+              if (IT.storage.disable_auto_dubbing === true) {
+                IT.selectPermittedAudioTrack(player);
+              }
+            }, 0);
+          }
+        };
+        guard2.interval = canReadCurrentTrack ? setInterval(guard2.enforce, 1e3) : null;
+        video?.addEventListener("loadedmetadata", guard2.forceSelection);
+        video?.addEventListener("playing", guard2.enforce);
+        this.autoDubbingGuard = guard2;
+      }
+      this.autoDubbingGuard.enforce();
+    };
+    this.selectPermittedAudioTrack(this.elements.player);
+    this.enforceAutoDubbingPolicy();
+  };
+  function disableAutoDubbing(player, settings2) {
+    IT.storage = settings2;
+    IT.elements.player = player;
+    if (settings2.disable_auto_dubbing === true) IT.disableAutoDubbing();
+    else if (IT.stopAutoDubbingGuard) IT.stopAutoDubbingGuard();
+  }
+
+  // src/page/playlist.js
+  var s = {};
+  var reversed = false;
+  var root = document.documentElement;
+  var save = (key, value) => document.dispatchEvent(new CustomEvent("it-set", { detail: JSON.stringify({ key, value }) }));
+  function playlistSettings(next) {
+    s = next;
+    reversed = s.playlist_reversed_active === true;
+    update();
+  }
+  function update() {
+    const on = s.playlist_reverse === true && reversed && new URLSearchParams(location.search).has("list");
+    if (on) root.setAttribute("it-playlist-reversed", "");
+    else root.removeAttribute("it-playlist-reversed");
+    const b = document.getElementById("it-reverse-playlist");
+    if (b) b.classList.toggle("active", reversed);
+    if (s.playlist_reverse === true) injectButton();
+    else b?.remove();
+    if (on) setTimeout(scrollPanelToCurrent, 100);
+  }
+  function injectButton() {
+    if (document.getElementById("it-reverse-playlist")) return;
+    const row = YT.playlistButtonRow.map((q) => document.querySelector(q)).find(Boolean);
+    const rowButtons = row ? [...row.children].filter((c) => c.id !== "it-reverse-playlist" && c.matches(YT.playlistRowButtons)) : [];
+    const after = rowButtons[rowButtons.length - 1] || null;
+    const spot = after ? after.parentElement : YT.playlistButtonSpots.map((q) => document.querySelector(q)).find(Boolean);
+    if (!spot) return;
+    const button = document.createElement("button");
+    button.id = "it-reverse-playlist";
+    button.className = "style-scope yt-icon-button" + (reversed ? " active" : "");
+    button.title = "Reverse Playlist";
+    const NS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("width", "24");
+    svg.setAttribute("height", "24");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    const path = document.createElementNS(NS, "path");
+    path.setAttribute("d", "M9 3L5 6.99h3V14h2V6.99h3L9 3zm7 14.01V10h-2v7.01h-3L15 21l4-3.99h-3z");
+    svg.appendChild(path);
+    button.appendChild(svg);
+    button.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      reversed = !reversed;
+      save("playlist_reversed_active", reversed);
+      update();
+    }, true);
+    if (after) after.after(button);
+    else spot.appendChild(button);
+  }
+  var reinjectPending = false;
+  new MutationObserver(() => {
+    if (reinjectPending || s.playlist_reverse !== true || !location.search.includes("list=")) return;
+    if (document.getElementById("it-reverse-playlist")) return;
+    reinjectPending = true;
+    requestAnimationFrame(() => {
+      reinjectPending = false;
+      injectButton();
+    });
+  }).observe(root, { childList: true, subtree: true });
+  function scrollPanelToCurrent() {
+    const sel = document.querySelector(YT.playlistSelected);
+    let box = sel && document.querySelector(YT.playlistItems);
+    while (box && box.scrollHeight <= box.clientHeight) box = box.parentElement;
+    if (!sel || !box || box === root || box === document.body || !box.closest(YT.playlistPanel)) return;
+    const r = sel.getBoundingClientRect(), b = box.getBoundingClientRect();
+    if (r.top < b.top || r.bottom > b.bottom) box.scrollTop += r.top - b.top - (b.height - r.height) / 2;
+  }
+  function entries() {
+    const panel = document.querySelector(YT.playlistPanel);
+    const contents = (panel && (panel.data || panel.__data?.data) || {}).contents || [];
+    return contents.map((c, i) => {
+      const r = c.playlistPanelVideoRenderer;
+      const we = r?.navigationEndpoint?.watchEndpoint;
+      return r?.videoId ? { videoId: r.videoId, index: typeof we?.index === "number" ? we.index + 1 : i + 1 } : null;
+    }).filter(Boolean);
+  }
+  function goBack(video) {
+    const params = new URLSearchParams(location.search);
+    const videoId = params.get("v"), list = params.get("list");
+    if (!videoId || !list) return;
+    const all = entries();
+    const current = all.find((e) => e.videoId === videoId)?.index ?? (parseInt(params.get("index"), 10) || null);
+    if (!current) return;
+    if (current <= 1) {
+      video.pause();
+      return;
+    }
+    const target = all.find((e) => e.index === current - 1);
+    for (const a of document.querySelectorAll(YT.playlistLinks)) {
+      const href = a.getAttribute("href") || "";
+      const m = href.match(/[?&]index=(\d+)/);
+      if (target && href.includes("v=" + target.videoId) || !target && m && parseInt(m[1], 10) === current - 1) {
+        video.pause();
+        a.click();
+        scrollTo(0, 0);
+        setTimeout(() => scrollTo(0, 0), 300);
+        return;
+      }
+    }
+    if (target) {
+      video.pause();
+      location.href = "/watch?v=" + encodeURIComponent(target.videoId) + "&list=" + encodeURIComponent(list) + "&index=" + (current - 1);
+    }
+  }
+  var state = { key: null, armed: false };
+  function onTime(e) {
+    if (s.playlist_reverse !== true || !reversed) return;
+    const video = e.target;
+    if (!(video instanceof HTMLVideoElement) || !video.duration || !isFinite(video.duration)) return;
+    if (!/[?&]list=/.test(location.search) || document.querySelector(YT.adShowing) || !video.matches(YT.mainVideo)) return;
+    const params = new URLSearchParams(location.search);
+    const key = params.get("v") + "|" + params.get("list");
+    if (state.key !== key) {
+      state.key = key;
+      state.armed = false;
+    }
+    if (e.type === "timeupdate" && video.duration - video.currentTime > 2) state.armed = true;
+    if (!state.armed) return;
+    if (e.type !== "ended" && video.duration - video.currentTime > 0.6) return;
+    state.armed = false;
+    goBack(video);
+  }
+  document.addEventListener("timeupdate", onTime, true);
+  document.addEventListener("ended", onTime, true);
+  document.addEventListener(YT.navigateFinish, update);
+
+  // src/page/autoplay.js
+  var s2 = {};
+  function autoplaySettings(next) {
+    s2 = next;
+  }
+  var HELD = "it-autoplay-held";
+  var interactedOn = null;
+  addEventListener("pointerdown", () => interactedOn = location.href, true);
+  addEventListener("keydown", () => interactedOn = location.href, true);
+  var youStartedIt = () => interactedOn === location.href;
+  document.addEventListener("play", (e) => {
+    const v = e.target;
+    if (!(v instanceof HTMLVideoElement)) return;
+    const player = v.closest(".html5-video-player");
+    if (!player || player.classList.contains("ad-showing")) return;
+    if (youStartedIt()) {
+      player.removeAttribute(HELD);
+      return;
+    }
+    const onVideo = location.pathname === "/watch" && !/[?&]list=/.test(location.search);
+    const onChannelHome = CHANNEL_ANY.test(location.pathname) && !CHANNEL_TAB.test(location.pathname);
+    if (!(s2.player_autoplay_disable === true && onVideo || s2.channel_trailer_autoplay === false && onChannelHome)) return;
+    player.setAttribute(HELD, "");
+    try {
+      player.pauseVideo();
+    } catch {
+      v.pause();
+    }
+    if (!v.paused) v.pause();
+  }, true);
+  document.addEventListener(YT.navigateStart, () => document.querySelectorAll("[" + HELD + "]").forEach((p) => p.removeAttribute(HELD)));
+
+  // src/page/main.js
+  var settings = {};
+  var lastVideo = null;
+  function guard(name, fn) {
+    try {
+      fn();
+    } catch (e) {
+      console.error("[Focus for YouTube] " + name + ":", e);
+      try {
+        document.dispatchEvent(new CustomEvent("it-error", { detail: JSON.stringify({ name, msg: name + ": " + (e && e.message || e) }) }));
+      } catch {
+      }
+    }
+  }
+  function resizeSignal() {
+    for (const ms of [0, 150, 500, 1200]) setTimeout(() => window.dispatchEvent(new Event("resize")), ms);
+  }
+  document.addEventListener("it-settings", (e) => {
+    let next;
+    try {
+      next = JSON.parse(e.detail);
+    } catch {
+      return;
+    }
+    const first = !Object.keys(settings).length;
+    settings = next;
+    guard("autoplay", () => autoplaySettings(settings));
+    guard("reverse playlist", () => playlistSettings(settings));
+    guard("theater mode", forcedTheaterFallback);
+    guard("player size", resizeSignal);
+    if (first) {
+      guard("blank video watch", watchForBlankVideo);
+      guard("new video", onNewVideo);
+    }
+    guard("fit recheck", watchFitSize);
+    if (!first) {
+      guard("quality", applyQuality);
+      guard("audio enhancements", () => {
+        const p = document.querySelector(YT.player);
+        if (p) {
+          delete p.dataset.itEnh;
+          enhancements(p, settings);
+        }
+      });
+    }
+  });
+  var fitTimer = null;
+  function watchFitSize() {
+    clearInterval(fitTimer);
+    if (settings.fit_recheck !== true || settings.player_size !== "fit_to_window" || location.pathname !== "/watch") return;
+    let n = 0, lastNudge = 0;
+    fitTimer = setInterval(() => {
+      if (++n > 200) return clearInterval(fitTimer);
+      const flexy = document.querySelector(YT.watchFlexy), v = document.querySelector(YT.playerVideo);
+      const box = document.querySelector(YT.fullBleedBox);
+      if (!flexy || !v || !box || !isTheater(flexy) || flexy.hasAttribute("fullscreen")) return;
+      const b = box.getBoundingClientRect(), r = v.getBoundingClientRect();
+      if (b.height > 100 && r.height > 2 && r.height < b.height - 4 && Date.now() - lastNudge > 600) {
+        lastNudge = Date.now();
+        window.dispatchEvent(new Event("resize"));
+      }
+    }, 200);
+  }
+  var rescueTimer = null;
+  function watchForBlankVideo() {
+    clearInterval(rescueTimer);
+    document.documentElement.removeAttribute("it-video-rescue");
+    if (location.pathname !== "/watch") return;
+    let n = 0;
+    rescueTimer = setInterval(() => {
+      const p = document.querySelector(YT.player), v = document.querySelector(YT.playerVideo);
+      if (!p || !v) {
+        if (++n > 20) clearInterval(rescueTimer);
+        return;
+      }
+      const pr = p.getBoundingClientRect(), vr = v.getBoundingClientRect();
+      if (pr.width > 100 && pr.height > 100 && (vr.width < 2 || vr.height < 2)) {
+        document.documentElement.setAttribute("it-video-rescue", "");
+        resizeSignal();
+      }
+      if (++n > 20) clearInterval(rescueTimer);
+    }, 700);
+  }
+  document.dispatchEvent(new CustomEvent("it-settings-request"));
+  function whenPlayerReady(cb, tries = 0) {
+    const player = document.querySelector(YT.player);
+    if (player && typeof player.getAvailableQualityLevels === "function") return cb(player);
+    if (tries < 50) setTimeout(() => whenPlayerReady(cb, tries + 1), 100);
+  }
+  function onNewVideo() {
+    if (location.pathname !== "/watch" || !Object.keys(settings).length) return;
+    if (lastVideo === location.href) return;
+    lastVideo = location.href;
+    whenPlayerReady((player) => {
+      delete player.dataset.itQuality;
+      guard("quality", applyQuality);
+      guard("subtitles", () => subtitles(player, settings));
+      guard("auto-dubbing", () => disableAutoDubbing(player, settings));
+      guard("up next autoplay", () => upNextAutoplay(settings));
+      guard("audio enhancements", () => enhancements(player, settings));
+      guard("player size", resizeSignal);
+    });
+  }
+  function applyQuality() {
+    const player = document.querySelector(YT.player);
+    if (player) setQuality(player, wantedQuality(settings));
+  }
+  document.addEventListener(YT.navigateFinish, () => {
+    guard("blank video watch", watchForBlankVideo);
+    guard("fit recheck", watchFitSize);
+    guard("new video", onNewVideo);
+    guard("theater mode", forcedTheaterFallback);
+  });
+  document.addEventListener("loadedmetadata", (e) => {
+    if (e.target.closest?.(YT.player)) applyQuality();
+  }, true);
+  document.addEventListener("fullscreenchange", () => setTimeout(applyQuality, 300));
+  document.addEventListener("visibilitychange", () => guard("quality", applyQuality));
+  var theaterWait = null;
+  function forcedTheaterFallback() {
+    if (settings.forced_theater_mode !== true || location.pathname !== "/watch") return;
+    if (theaterWait) return;
+    const started = Date.now();
+    let lastClick = 0;
+    const step = () => {
+      if (settings.forced_theater_mode !== true || location.pathname !== "/watch" || Date.now() - started > 3e4) return stop();
+      const flexy = document.querySelector(YT.watchFlexy);
+      if (flexy && isTheater(flexy)) {
+        resizeSignal();
+        return stop();
+      }
+      const button = document.querySelector(YT.theaterButton);
+      if (flexy && button && Date.now() - lastClick > 700) {
+        lastClick = Date.now();
+        button.click();
+      }
+    };
+    theaterWait = setInterval(step, 200);
+    step();
+    function stop() {
+      clearInterval(theaterWait);
+      theaterWait = null;
+    }
+  }
+})();

@@ -1,0 +1,1029 @@
+/* While a video page is still arranging itself (Force Theater Mode / Fit to window), keep its content hidden so
+   the in-between layouts never show. early.js removes the attribute; never longer than 6 s on a first load, 2.5 s after. */
+html[it-layout-settling] ytd-watch-flexy {
+  visibility: hidden !important;
+}
+/* On a first load YouTube first draws the player OUTSIDE ytd-watch-flexy, in its default (shorter, below-the-header-space)
+   size, and moves it into the watch page later (seen in the size log: 1920x748 at top 56 for ~1.5 s, then full height).
+   The cover has to hide that early player and the page area around it too, or the small player shows. */
+html[it-layout-settling][data-page-type='video'] :is(ytd-page-manager, ytd-player, #movie_player) {
+  visibility: hidden !important;
+}
+
+/* Thumbnails per row, as styling only (ImprovedTube general.js changeThumbnailsPerRow rewrote the grid's inline
+   style on every page change; an !important rule overrides YouTube's inline value with nothing to watch). */
+html[it-change-thumbnails-per-row='2'] :is(ytd-rich-grid-renderer, ytd-rich-shelf-renderer, [style*='--ytd-rich-grid-items-per-row']) { --ytd-rich-grid-items-per-row: 2 !important; }
+html[it-change-thumbnails-per-row='3'] :is(ytd-rich-grid-renderer, ytd-rich-shelf-renderer, [style*='--ytd-rich-grid-items-per-row']) { --ytd-rich-grid-items-per-row: 3 !important; }
+html[it-change-thumbnails-per-row='4'] :is(ytd-rich-grid-renderer, ytd-rich-shelf-renderer, [style*='--ytd-rich-grid-items-per-row']) { --ytd-rich-grid-items-per-row: 4 !important; }
+html[it-change-thumbnails-per-row='5'] :is(ytd-rich-grid-renderer, ytd-rich-shelf-renderer, [style*='--ytd-rich-grid-items-per-row']) { --ytd-rich-grid-items-per-row: 5 !important; }
+html[it-change-thumbnails-per-row='6'] :is(ytd-rich-grid-renderer, ytd-rich-shelf-renderer, [style*='--ytd-rich-grid-items-per-row']) { --ytd-rich-grid-items-per-row: 6 !important; }
+html[it-change-thumbnails-per-row='7'] :is(ytd-rich-grid-renderer, ytd-rich-shelf-renderer, [style*='--ytd-rich-grid-items-per-row']) { --ytd-rich-grid-items-per-row: 7 !important; }
+html[it-change-thumbnails-per-row='8'] :is(ytd-rich-grid-renderer, ytd-rich-shelf-renderer, [style*='--ytd-rich-grid-items-per-row']) { --ytd-rich-grid-items-per-row: 8 !important; }
+html[it-change-thumbnails-per-row] :is(ytd-rich-grid-renderer, [style*='--ytd-rich-grid-items-per-row']):not(ytd-rich-shelf-renderer) { --ytd-rich-grid-item-min-width: 220px !important; --ytd-rich-grid-item-max-width: 1fr !important; }
+
+/* Reverse playlist: flip the panel visually only (YouTube's own data stays untouched; personal build item 11). */
+html[it-playlist-reversed] ytd-playlist-panel-renderer #items { display: flex !important; flex-direction: column-reverse !important; }
+#it-reverse-playlist { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; vertical-align: middle; flex: none; background: none; border: 0; border-radius: 50%; padding: 8px; cursor: pointer; fill: var(--yt-spec-text-primary, #aaa); }
+#it-reverse-playlist:hover { background: var(--yt-spec-10-percent-layer, rgba(255,255,255,.1)); }
+#it-reverse-playlist.active { fill: var(--yt-spec-call-to-action, #3ea6ff); }
+
+/* Autoplay off: while a video is held (not started by you yet), keep YouTube's thumbnail cover showing instead of a
+   black player (src/page/autoplay.js sets the attribute; pressing play removes it). */
+.html5-video-player[it-autoplay-held] .ytp-cued-thumbnail-overlay { display: block !important; opacity: 1 !important; visibility: visible !important; }
+.html5-video-player[it-autoplay-held] .ytp-cued-thumbnail-overlay-image { display: block !important; }
+
+/* Live chat scrolls with the video: YouTube reserves the pinned chat's column below the player with right padding;
+   reclaim it so the description, comments and related videos use the full width (same rule as ImprovedTube's
+   "hide live chat" option, sidebar.css). */
+html[it-live-chat-scroll='true'] ytd-watch-flexy[fixed-panels] #columns.ytd-watch-flexy { padding-right: 0 !important; }
+
+/* Progress bar colours under the browser's automatic dark mode for websites (Brave/Chrome "Auto Dark Mode for Web
+   Contents"), which turns very light colours dark: ImprovedTube's Yellow (#ffeb3b) came out #382c00 and White
+   (#ffffff) #121212. The closest shades that stay as they are (measured): yellow #f9e000, white -> light grey #cccccc.
+   The other 17 colours are unaffected. Only with the "My browser uses Auto Dark Mode" switch on (an extension can't
+   detect auto dark mode: it's applied while the page is drawn); off = ImprovedTube's original colours. */
+html[it-auto-dark-colors='true'][it-player-color='yellow'] { --it-player-color: #f9e000 !important; }
+html[it-auto-dark-colors='true'][it-player-color='white'] { --it-player-color: #cccccc !important; }
+
+/* The buffered part of the progress bar under the browser's automatic dark mode (with the "My browser uses Auto Dark Mode"
+   switch on): YouTube draws the unplayed track, the buffered part and the hover preview as see-through white, which auto
+   dark turns near-black, and it darkened the buffered part MORE than the track behind it (measured on #555 behind the
+   bar: track #484848, buffered #323232, so what was loaded looked darker than what wasn't). Light grey #cccccc stays as
+   it is, so the same three layers are drawn in it with the see-through amounts that give YouTube's normal result. */
+html[it-auto-dark-colors='true'] .ytp-progress-list { background: rgba(204, 204, 204, 0.29) !important; }
+html[it-auto-dark-colors='true'] .ytp-load-progress { background: rgba(204, 204, 204, 0.74) !important; }
+html[it-auto-dark-colors='true'] .ytp-hover-progress { background: rgba(204, 204, 204, 0.71) !important; }
+
+/* Volume slider under the browser's automatic dark mode (with the "My browser uses Auto Dark Mode" switch on): YouTube
+   draws the knob and filled bar white with page styling, which auto dark turns near-black (#121212, measured); the
+   icons are graphics and stay white. Light grey #cccccc stays as it is; the unfilled part gets YouTube's normal
+   #333333 (auto dark turned its faint white #040404, invisible). Structure: .ytp-volume-slider-handle = knob,
+   ::before = filled bar, ::after = unfilled bar. */
+html[it-auto-dark-colors='true'] .ytp-volume-slider-handle,
+html[it-auto-dark-colors='true'] .ytp-volume-slider-handle::before { background: #cccccc !important; }
+html[it-auto-dark-colors='true'] .ytp-volume-slider-handle::after { background: #333333 !important; }
+/* The unfilled bar starts at the knob's centre and is drawn on top of it; with a dark unfilled bar that showed as a
+   line across the knob's right half. Moving it behind (z-index -1) didn't work on YouTube, whose knob forms its own
+   layer; instead start it at the knob's right edge so it never crosses the knob. (The filled bar ends at the centre
+   too, but it's the same grey as the knob, so it doesn't show.) */
+html[it-auto-dark-colors='true'] .ytp-volume-slider-handle::after { left: 100% !important; }
+
+/* while Focus presses YouTube's own audio switches in the settings menu, keep the menu invisible */
+html[it-menu-probe] .ytp-popup, html[it-menu-probe] .ytp-settings-menu, html[it-menu-probe] .ytp-tooltip { opacity: 0 !important; pointer-events: none !important; transition: none !important; }
+
+/* wrap_video_info: narrow cards (4+ per row) cut "channel - views - upload time" off with "...". Let those lines wrap and
+   the title use two lines, so nothing is hidden. Not an ImprovedTube setting. */
+html[it-wrap-video-info='true'] :is([class*="content-metadata-view-model"][class*="metadata-row"], [class*="ContentMetadataViewModelMetadataRow"], ytd-video-meta-block #metadata-line, ytd-video-meta-block #byline-container, ytd-video-meta-block ytd-channel-name, ytd-channel-name #container, ytd-channel-name #text-container, ytd-channel-name yt-formatted-string#text) {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  max-width: none !important;
+  height: auto !important;
+  max-height: none !important;
+}
+html[it-wrap-video-info='true'] :is([class*="content-metadata-view-model"][class*="metadata-row"], [class*="ContentMetadataViewModelMetadataRow"]) {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  column-gap: 4px !important;
+}
+html[it-wrap-video-info='true'] :is([class*="content-metadata-view-model"][class*="metadata-row"], [class*="ContentMetadataViewModelMetadataRow"]) > * {
+  flex: 0 1 auto !important; /* whole items move to the next line; one only shrinks if it is wider than the line by itself */
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  max-width: 100% !important;
+}
+html[it-wrap-video-info='true'] :is(ytd-rich-item-renderer, yt-lockup-view-model) :is(h3, #video-title, [class*="lockup-metadata-view-model"][class*="title"], [class*="LockupMetadataViewModelTitle"]) {
+  -webkit-line-clamp: 3 !important;
+  max-height: none !important;
+}
+
+/* join = "hidden" on channel pages and under videos: YouTube's newer layout draws the Join button as a plain button
+   (no #sponsor-button), so it is found by its label. English label only. Not an ImprovedTube rule. */
+html[it-join='hidden'] :is(button-view-model, yt-button-view-model):has(> :is(button, a)[aria-label^="Join" i]) {
+  display: none !important;
+}
+
+/* hide_explore_topics: the "Explore more topics" section (chips with a video shelf) on the home page. Not an ImprovedTube setting. */
+html[it-hide-explore-topics='true'] ytd-rich-section-renderer:has(> #content > ytd-chips-shelf-with-video-shelf-renderer),
+html[it-hide-explore-topics='true'] ytd-chips-shelf-with-video-shelf-renderer { display: none !important; }
+/* hide_free_movies: shelves marked by features.js (found by their heading: no stable hook to match in CSS) */
+html[it-hide-free-movies='true'] ytd-rich-section-renderer[it-shelf-gone] { display: none !important; }
+
+/* hide_related_sidebar: the list of recommended videos beside (or, in theater mode, under) the video. The live chat, the
+   playlist panel and the comments are separate elements and stay. Not an ImprovedTube setting. */
+html[it-hide-related-sidebar='true'] ytd-watch-flexy #related,
+html[it-hide-related-sidebar='true'] ytd-watch-flexy ytd-watch-next-secondary-results-renderer { display: none !important; }
+/* hide_members_only / hide_premieres: cards marked by features.js (the badge text is the only hook) */
+html[it-hide-members-only='true'] [it-card-members],
+html[it-hide-premieres='true'] [it-card-premiere] { display: none !important; }
+
+/* hide_sign_in: the Sign in button in the top bar and the "Sign in to like videos, comment, and subscribe" box in the left
+   menu (the sign-in links all point at accounts.google.com). Not an ImprovedTube setting. */
+html[it-hide-sign-in='true'] ytd-masthead :is(ytd-button-renderer, yt-button-view-model, button-view-model):has(a[href*="accounts.google.com"]),
+html[it-hide-sign-in='true'] ytd-guide-signin-promo-renderer,
+html[it-hide-sign-in='true'] ytd-guide-section-renderer:has(> ytd-guide-signin-promo-renderer),
+html[it-hide-sign-in='true'] ytd-guide-section-renderer:has(> #items > ytd-guide-signin-promo-renderer) { display: none !important; }
+
+/* disable_page_transition: YouTube morphs the clicked thumbnail into the player (a browser "view transition"); the
+   player can look small for a moment while that plays. Hide the transition layers and cut their animations. */
+html[it-disable-page-transition='true']::view-transition,
+html[it-disable-page-transition='true']::view-transition-group(*),
+html[it-disable-page-transition='true']::view-transition-image-pair(*),
+html[it-disable-page-transition='true']::view-transition-old(*),
+html[it-disable-page-transition='true']::view-transition-new(*) {
+	animation: none !important;
+	display: none !important;
+}
+
+/* fit_without_theater (with Fit to window): theater mode off, so the player sits in the left column next to the side list.
+   The two columns become one grid: the player row spans the whole window width and height (as in theater); under it the
+   video info and comments sit on the left and the side list on the right. */
+html[data-page-type='video'][it-player-size='fit_to_window'][it-fit-without-theater='true'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy:not([theater]):not([full-bleed-player]):not([fullscreen]) #columns {
+	display: grid !important;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1000px) 402px minmax(0, 1fr) !important;
+	column-gap: 0 !important;
+	max-width: none !important;
+	padding: 0 !important;
+	margin: 0 !important;
+}
+html[data-page-type='video'][it-player-size='fit_to_window'][it-fit-without-theater='true'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy:not([theater]):not([full-bleed-player]):not([fullscreen]) #primary,
+html[data-page-type='video'][it-player-size='fit_to_window'][it-fit-without-theater='true'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy:not([theater]):not([full-bleed-player]):not([fullscreen]) #primary-inner {
+	display: contents !important;
+}
+html[data-page-type='video'][it-player-size='fit_to_window'][it-fit-without-theater='true'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy:not([theater]):not([full-bleed-player]):not([fullscreen]) #player {
+	grid-column: 1 / -1 !important;
+	grid-row: 1 !important;
+	min-width: 0 !important;
+}
+html[data-page-type='video'][it-player-size='fit_to_window'][it-fit-without-theater='true'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy:not([theater]):not([full-bleed-player]):not([fullscreen]) #below {
+	grid-column: 2 !important;
+	grid-row: 2 !important;
+	min-width: 0 !important;
+	max-width: none !important;
+}
+html[data-page-type='video'][it-player-size='fit_to_window'][it-fit-without-theater='true'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy:not([theater]):not([full-bleed-player]):not([fullscreen]) #primary-inner > :not(#player):not(#below) {
+	grid-column: 2 !important;
+	min-width: 0 !important;
+}
+html[data-page-type='video'][it-player-size='fit_to_window'][it-fit-without-theater='true'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy:not([theater]):not([full-bleed-player]):not([fullscreen]) #secondary {
+	grid-column: 3 !important;
+	grid-row: 2 !important;
+	align-self: start !important;
+	width: 402px !important;
+	max-width: 402px !important;
+	margin: 56px 0 0 24px !important; /* down to about the channel name's height, clear of the player */
+	padding: 0 !important;
+}
+html[data-page-type='video'][it-player-size='fit_to_window'][it-fit-without-theater='true'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy:not([theater]):not([full-bleed-player]):not([fullscreen]) #player-container-outer {
+	max-width: none !important;
+	min-width: 0 !important;
+	margin: 0 !important;
+}
+html[data-page-type='video'][it-player-size='fit_to_window'][it-fit-without-theater='true'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy:not([theater]):not([full-bleed-player]):not([fullscreen]) #player-container-inner {
+	padding-top: 0 !important;
+	height: calc(var(--it-player-size, 100vh) - var(--it-header-size, 0px)) !important;
+}
+html[data-page-type='video'][it-player-size='fit_to_window'][it-fit-without-theater='true'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy:not([theater]):not([full-bleed-player]):not([fullscreen]) #player-container,
+html[data-page-type='video'][it-player-size='fit_to_window'][it-fit-without-theater='true'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy:not([theater]):not([full-bleed-player]):not([fullscreen]) ytd-player,
+html[data-page-type='video'][it-player-size='fit_to_window'][it-fit-without-theater='true'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy:not([theater]):not([full-bleed-player]):not([fullscreen]) #movie_player {
+	position: static !important;
+	width: 100% !important;
+	height: 100% !important;
+}
+/* the picture is sized like in theater (window height, 16:9 width) and centered, not stretched to the whole player */
+html[data-page-type='video'][it-player-size='fit_to_window'][it-fit-without-theater='true'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy:not([theater]):not([full-bleed-player]):not([fullscreen]) ytd-player > #container,
+html[data-page-type='video'][it-player-size='fit_to_window'][it-fit-without-theater='true'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy:not([theater]):not([full-bleed-player]):not([fullscreen]) .html5-video-container {
+	display: flex !important;
+	justify-content: center !important;
+	align-items: center !important;
+	width: 100% !important;
+	height: 100% !important;
+}
+html[data-page-type='video'][it-player-size='fit_to_window'][it-fit-without-theater='true'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy:not([theater]):not([full-bleed-player]):not([fullscreen]) video {
+	position: static !important;
+	max-height: none !important;
+	max-width: 100% !important;
+	height: var(--height, 100%) !important;
+	width: 100% !important; /* not from YouTube's ratio, which can be 0 or stale */
+	object-fit: contain !important;
+}
+html[data-page-type='video'][it-player-size='fit_to_window'][it-fit-without-theater='true'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy:not([theater]):not([full-bleed-player]):not([fullscreen]) {
+	overflow-x: clip !important;
+	/* the page's top space for a hidden header is not reserved in this layout, so don't subtract it (the player was 48px short) */
+	--it-header-size: 0px !important;
+}
+/* black bars at the sides of the picture (not the page's dark grey), unless "Transparent player background" is on */
+html[data-page-type='video'][it-player-size='fit_to_window'][it-fit-without-theater='true']:not([it-player-transparent-background='true']) ytd-app:not([player-fullscreen_]) ytd-watch-flexy:not([theater]):not([full-bleed-player]):not([fullscreen]) #player,
+html[data-page-type='video'][it-player-size='fit_to_window'][it-fit-without-theater='true']:not([it-player-transparent-background='true']) ytd-app:not([player-fullscreen_]) ytd-watch-flexy:not([theater]):not([full-bleed-player]):not([fullscreen]) #player-container-outer,
+html[data-page-type='video'][it-player-size='fit_to_window'][it-fit-without-theater='true']:not([it-player-transparent-background='true']) ytd-app:not([player-fullscreen_]) ytd-watch-flexy:not([theater]):not([full-bleed-player]):not([fullscreen]) #player-container-inner,
+html[data-page-type='video'][it-player-size='fit_to_window'][it-fit-without-theater='true']:not([it-player-transparent-background='true']) ytd-app:not([player-fullscreen_]) ytd-watch-flexy:not([theater]):not([full-bleed-player]):not([fullscreen]) #movie_player {
+	background: #000 !important;
+}
+
+/* Ported from ImprovedTube (github.com/code-charity/youtube); see LICENSE-ImprovedTube.
+   Generated by tools/port-css.py: only the rules for the values in FEATURES.md. Each block notes its source. */
+
+/* ambient_lighting = false  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-ambient-lighting='false'] #cinematics {display: none !important;
+}
+
+
+/* header_position = "hidden_on_video_page"  [extension/www.youtube.com/appearance/header/header.css] */
+html[data-page-type=video][it-header-position=hidden_on_video_page] #masthead-container:not([it-search-focus=true]) {
+	transform: translateY(-100%);
+}
+/* header_position = "hidden_on_video_page"  [extension/www.youtube.com/appearance/header/header.css] */
+html[data-page-type=video][it-header-position=hidden_on_video_page] tp-yt-app-drawer#guide #guide-spacer {
+	display:none;
+}
+/* header_position = "hidden_on_video_page"  [extension/www.youtube.com/appearance/header/header.css] */
+html[data-page-type='video'][it-header-position=hidden_on_video_page] ytd-page-manager#page-manager {
+	margin-top: 0;
+}
+/* header_position = "hidden_on_video_page"  [extension/www.youtube.com/appearance/header/header.css] */
+html[data-page-type=video][it-header-position=hidden_on_video_page] #masthead-container:not([it-search-focus=true]):focus-within {
+	transform: translateY(0%);
+	opacity: 1 !important;
+}
+/* header_position = "hidden_on_video_page"  [extension/www.youtube.com/appearance/player/player.css] */
+html[data-page-type=video][it-header-position=hidden_on_video_page] {
+	--it-header-size: 0px;
+}
+/* header_position = "hidden_on_video_page"  [extension/www.youtube.com/appearance/player/player.css] */
+html[data-page-type=video][it-header-position=hidden_on_video_page] ytd-watch-flexy:not([theater]) {
+	--it-header-size: 48px;
+}
+/* header_position = "hidden_on_video_page"  [extension/www.youtube.com/appearance/player/player.css] */
+html[data-page-type=video][it-header-position=hidden_on_video_page] div#page {
+	--it-header-size: 0px;
+}
+/* header_position = "hidden_on_video_page"  [extension/www.youtube.com/appearance/player/player.css] */
+html[data-page-type=video][it-header-position=hidden_on_video_page] div#page:not(.watch-wide) {
+	--it-header-size: 20px;
+}
+
+/* hide_ai_summary = true  [extension/www.youtube.com/general/general.css] */
+html[it-hide-ai-summary='true'] ytd-expandable-metadata-renderer[has-video-summary] {
+	display: none !important;
+}
+
+/* hide_ask_button = "hidden"  [extension/www.youtube.com/appearance/details/details.css] */
+html[it-hide-ask-button='hidden'] #menu yt-button-view-model:has(svg path[d^="M480-80q0-83-31.5"]),
+html[it-hide-ask-button='hidden'] #flexible-item-buttons yt-button-view-model:has(svg path[d^="M480-80q0-83-31.5"]),
+html[it-hide-ask-button='hidden'] tp-yt-paper-listbox tp-yt-paper-item:has(svg path[d^="M480-80q0-83-31.5"]) {display: none !important;
+}
+
+/* hide_clip_button = "hidden"  [extension/www.youtube.com/appearance/details/details.css] */
+html[it-hide-clip-button='hidden'] #menu yt-button-view-model:has(svg path[d^="M6 2.002a4 4 0 102.03"]),
+html[it-hide-clip-button='hidden'] #flexible-item-buttons yt-button-view-model:has(svg path[d^="M6 2.002a4 4 0 102.03"]),
+html[it-hide-clip-button='hidden'] tp-yt-paper-listbox tp-yt-paper-item:has(svg path[d^="M6 2.002a4 4 0 102.03"]),
+html[it-hide-clip-button='hidden'] #menu button:has(svg path[d^="M8 7c0 .55-.45 1-1"]),
+html[it-hide-clip-button='hidden'] #flexible-item-buttons button:has(svg path[d^="M8 7c0 .55-.45 1-1"]) {display: none !important;
+}
+
+/* hide_download_button = "hidden"  [extension/www.youtube.com/appearance/details/details.css] */
+html[it-hide-download-button='hidden']	ytd-download-button-renderer,
+html[it-hide-download-button='hidden'] #menu button:has(svg path[d^="M17 18v1H6v-1h11"]),
+html[it-hide-download-button='hidden'] #flexible-item-buttons button:has(svg path[d^="M17 18v1H6v-1h11"]) {display: none !important;
+}
+
+/* hide_includes_paid_promotion = true  [extension/www.youtube.com/appearance/player/player.css] */
+html[data-page-type=video][it-hide-includes-paid-promotion=true] .ytp-paid-content-overlay,
+html[data-page-type=home][it-hide-includes-paid-promotion=true] .YtmPaidContentOverlayLink,
+html[data-page-type=other][it-hide-includes-paid-promotion=true] .YtmPaidContentOverlayLink {
+  display: none !important;
+}
+
+/* hide_more_button = true  [extension/www.youtube.com/appearance/details/details.css] */
+html[it-hide-more-button='true'] #menu #button [class*="dropdown"],
+html[it-hide-more-button='true'] #menu button:has(svg path[d^="M7.5 12c0 .83-.67 1."]),
+html[it-hide-more-button='true'] #menu yt-button-shape#button-shape,
+html[it-hide-more-button='true'] #menu button:has(svg path[d^="M7.5,12c0,0.83-0.67,1.5"]),
+html[it-hide-more-button='true'] #flexible-item-buttons button:has(svg path[d^="M7.5,12c0,0.83-0.67,1.5-1.5"]) {display: none !important;
+}
+
+/* hide_report_button = "hidden"  [extension/www.youtube.com/appearance/details/details.css] */
+html[it-hide-report-button='hidden'] #menu yt-button-view-model:has(svg path[d^="m4 2.999-.146.073A1.55"]),
+html[it-hide-report-button='hidden'] #flexible-item-buttons yt-button-view-model:has(svg path[d^="m4 2.999-.146.073A1.55"]),
+html[it-hide-report-button='hidden'] tp-yt-paper-listbox tp-yt-paper-item:has(svg path[d^="m4 2.999-.146.073A1.55"]),
+html[it-hide-report-button='hidden'] #top-level-buttons-computed button#Report-button,
+html[it-hide-report-button='hidden'] #menu button:has(svg path[d^="m13.18 4 .24 1.2.16.8H19v7h-5.18l-.24-1.2-.16-.8H6V4h7.18M14"]),
+html[it-hide-report-button='hidden'] #flexible-item-buttons button:has(svg path[d^="m13.18 4 .24 1.2.16.8H19v7h-5.18l-.24-1.2-.16-.8H6V4h7.18M14"]) {display: none !important;
+}
+
+/* hide_save_button = "hidden"  [extension/www.youtube.com/appearance/details/details.css] */
+html[it-hide-save-button='hidden'] #menu yt-button-view-model:has(svg path[d^="M19 2H5a2 2 0 00-2"]),
+html[it-hide-save-button='hidden'] #flexible-item-buttons yt-button-view-model:has(svg path[d^="M19 2H5a2 2 0 00-2"]),
+html[it-hide-save-button='hidden'] tp-yt-paper-listbox tp-yt-paper-item:has(svg path[d^="M19 2H5a2 2 0 00-2"]),
+html[it-hide-save-button='hidden'] #menu button:has(svg path[d^="M22 13h-4v4h-2v-4h"]),
+html[it-hide-save-button='hidden'] #flexible-item-buttons button:has(svg path[d^="M22 13h-4v4h-2v-4h"]) {display: none !important;
+}
+
+/* hide_share_button = "hidden"  [extension/www.youtube.com/appearance/details/details.css] */
+html[it-hide-share-button='hidden'] #menu yt-button-view-model:has(svg path[d^="M10 3.158V7.51c"]),
+html[it-hide-share-button='hidden'] #flexible-item-buttons yt-button-view-model:has(svg path[d^="M10 3.158V7.51c"]),
+html[it-hide-share-button='hidden'] tp-yt-paper-listbox tp-yt-paper-item:has(svg path[d^="M10 3.158V7.51c"]),
+html[it-hide-share-button='hidden'] #menu button:has(svg path[d^="M15 5.63 20.66"]),
+html[it-hide-share-button='hidden'] #flexible-item-buttons button:has(svg path[d^="M15 5.63 20.66"]) {display: none !important;
+}
+
+/* hide_thanks_button = "hidden"  [extension/www.youtube.com/appearance/details/details.css] */
+html[it-hide-thanks-button='hidden'] #menu yt-button-view-model:has(svg path[d^="M16.25 2A6.7 6.7"]),
+html[it-hide-thanks-button='hidden'] #flexible-item-buttons yt-button-view-model:has(svg path[d^="M16.25 2A6.7 6.7"]),
+html[it-hide-thanks-button='hidden'] tp-yt-paper-listbox tp-yt-paper-item:has(svg path[d^="M16.25 2A6.7 6.7"]),
+html[it-hide-thanks-button='hidden'] #menu button:has(svg path[d^="M11 17h2v-1h1c.55 0"]),
+html[it-hide-thanks-button='hidden'] #flexible-item-buttons button:has(svg path[d^="M11 17h2v-1h1c.55 0"]) {display: none !important;
+}
+
+/* hide_voice_search_button = true  [extension/www.youtube.com/appearance/header/header.css] */
+html[it-hide-voice-search-button='true'] #voice-search-button {
+	display: none !important;
+}
+
+/* join = "hidden"  [extension/www.youtube.com/appearance/details/details.css] */
+html[it-join='hidden'] #sponsor-button,
+html[it-join='hidden'] ytd-sponsorships-offer-module-renderer {display: none !important;
+}
+
+/* player_color = "light_blue"  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-color='red'] {
+	--it-player-color: #f03;
+}
+/* player_color = "light_blue"  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-color='pink'] {
+	--it-player-color: #e91e63;
+}
+/* player_color = "light_blue"  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-color='purple'] {
+	--it-player-color: #9c27b0;
+}
+/* player_color = "light_blue"  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-color='deep_purple'] {
+	--it-player-color: #673ab7;
+}
+/* player_color = "light_blue"  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-color='indigo'] {
+	--it-player-color: #3f51b5;
+}
+/* player_color = "light_blue"  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-color='blue'] {
+	--it-player-color: #1e88e5;
+}
+/* player_color = "light_blue"  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-color='light_blue'] {
+	--it-player-color: #03a9f4;
+}
+/* player_color = "light_blue"  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-color='cyan'] {
+	--it-player-color: #00bcd4;
+}
+/* player_color = "light_blue"  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-color='teal'] {
+	--it-player-color: #009688;
+}
+/* player_color = "light_blue"  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-color='green'] {
+	--it-player-color: #4caf50;
+}
+/* player_color = "light_blue"  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-color='light_green'] {
+	--it-player-color: #8bc34a;
+}
+/* player_color = "light_blue"  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-color='lime'] {
+	--it-player-color: #cddc39;
+}
+/* player_color = "light_blue"  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-color='yellow'] {
+	--it-player-color: #ffeb3b;
+}
+/* player_color = "light_blue"  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-color='amber'] {
+	--it-player-color: #ffc107;
+}
+/* player_color = "light_blue"  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-color='orange'] {
+	--it-player-color: #ff9800;
+}
+/* player_color = "light_blue"  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-color='deep_orange'] {
+	--it-player-color: #ff5722;
+}
+/* player_color = "light_blue"  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-color='brown'] {
+	--it-player-color: #795548;
+}
+/* player_color = "light_blue"  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-color='blue_gray'] {
+	--it-player-color: #607d8b;
+}
+/* player_color = "light_blue"  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-color='white'] {
+	--it-player-color: #fff;
+}
+/* player_color = "light_blue"  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-color]:not([it-player-color='default']):not([it-player-color='normal']) .ytp-scrubber-button,
+html[it-player-color]:not([it-player-color='default']):not([it-player-color='normal']) .ytp-menuitem[aria-checked='true'] .ytp-menuitem-toggle-checkbox,
+html[it-player-color]:not([it-player-color='default']):not([it-player-color='normal']) .ytd-thumbnail-overlay-resume-playback-renderer {
+	background: var(--it-player-color) !important;
+	background-color: var(--it-player-color) !important;
+}
+/* player_color = "light_blue"  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-color]:not([it-player-color='default']):not([it-player-color='normal']) .ytp-swatch-color {
+	color: var(--it-player-color) !important;
+}
+/* player_color = "light_blue"  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-color]:not([it-player-color='default']):not([it-player-color='normal']) ytd-shorts .ytProgressBarLineProgressBarPlayed,
+html[it-player-color]:not([it-player-color='default']):not([it-player-color='normal']) ytd-shorts .YtProgressBarLineProgressBarPlayedRefresh {
+    background: var(--it-player-color) !important;
+    background-color: var(--it-player-color) !important;
+}
+/* player_color = "light_blue"  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-color]:not([it-player-color='default']):not([it-player-color='normal']) .ytp-settings-button.ytp-hd-quality-badge:after {
+	background-color: var(--it-player-color) !important;
+}
+/* player_color = "light_blue"  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-color]:not([it-player-color='default']):not([it-player-color='normal']) .ytp-play-progress,
+html[it-player-color]:not([it-player-color='default']):not([it-player-color='normal']) .YtThumbnailOverlayProgressBarHostWatchedProgressBarSegmentModern,
+html[it-player-color]:not([it-player-color='default']):not([it-player-color='normal']) .YtChapteredProgressBarChapteredPlayerBarChapterRefresh,
+html[it-player-color]:not([it-player-color='default']):not([it-player-color='normal']) .YtChapteredProgressBarChapteredPlayerBarFillRefresh,
+html[it-player-color]:not([it-player-color='default']):not([it-player-color='normal']) .YtProgressBarLineProgressBarPlayedRefresh,
+html[it-player-color]:not([it-player-color='default']):not([it-player-color='normal']) .yt-page-navigation-progress,
+html[it-player-color]:not([it-player-color='default']):not([it-player-color='normal']) .ytd-progress-bar-line {
+	background: var(--it-player-color) !important;
+}
+
+/* player_hide_annotations = true  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-hide-annotations='true'] .annotation,
+html[it-player-hide-annotations='true'] .annotation-type-text,
+html[it-player-hide-annotations='true'] .annotation-shape {
+	display: none !important;
+}
+
+/* player_hide_cards = true  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-hide-cards='true'] .ytp-ce-element,
+html[it-player-hide-cards='true'] .ytp-ce-video,
+html[it-player-hide-cards='true'] .ytp-cards-button,
+html[it-player-hide-cards='true'] .ytp-cards-teaser {
+	display: none !important;
+}
+
+/* player_size = "fit_to_window"  [extension/www.youtube.com/appearance/player/player.css] */
+html[data-page-type="video"][it-player-size]:not([it-player-size='do_not_change']) #movie-player .ytp-cued-thumbnail-overlay {z-index:10
+}
+/* player_size = "fit_to_window"  [extension/www.youtube.com/appearance/player/player.css] */
+html[data-page-type=video][it-player-size='fit_to_window'] ytd-watch-flexy[full-bleed-player]:not([fullscreen]) #full-bleed-container.ytd-watch-flexy {
+	height: calc(var(--it-player-size, 100vh) - var(--it-header-size, 0px)) !important;
+	max-height: var(--it-player-size, 100vh) !important;
+}
+/* player_size = "fit_to_window"  [extension/www.youtube.com/appearance/player/player.css] */
+html[data-page-type="video"][it-player-size="fit_to_window"] ytd-watch-flexy[default-layout]:not([no-top-margin]):not([reduced-top-margin]) #primary {padding-top:0
+}
+/* player_size = "fit_to_window"  [extension/www.youtube.com/appearance/player/player.css] */
+html[data-page-type=video][it-player-size='fit_to_window'] {
+	--it-player-size: 100vh;
+}
+/* player_size = "fit_to_window"  [extension/www.youtube.com/appearance/player/player.css] */
+html[data-page-type=video][it-player-size='fit_to_window'] .ytp-fit-cover-video .html5-main-video {
+	object-fit: contain !important;
+}
+/* player_size = "fit_to_window"  [extension/www.youtube.com/appearance/player/player.css] */
+html[data-page-type='video'][it-player-size='fit_to_window'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy[theater]:not([fullscreen]) #player-theater-container {
+	height: auto !important;
+	min-height: 0 !important;
+	max-height: unset !important;
+	background: transparent !important;
+}
+/* player_size = "fit_to_window"  [extension/www.youtube.com/appearance/player/player.css] */
+html[data-page-type='video'][it-player-size='fit_to_window'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy[theater]:not([fullscreen]) #player-container {
+	position: static !important;
+}
+/* player_size = "fit_to_window"  [extension/www.youtube.com/appearance/player/player.css] */
+html[data-page-type='video'][it-player-size='fit_to_window'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy[theater]:not([fullscreen]) ytd-player>#container {
+	display: flex !important;
+	width: 100% !important; /* the video is as wide as the page, whatever size the player reports */
+	justify-content: center !important;
+	align-items: center !important;
+}
+/* player_size = "fit_to_window"  [extension/www.youtube.com/appearance/player/player.css] */
+html[data-page-type='video'][it-player-size='fit_to_window'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy[theater]:not([fullscreen]) .html5-video-container {
+	display: flex !important;
+	width: 100% !important; /* the video is as wide as the page, whatever size the player reports */
+	justify-content: center !important;
+	align-items: center !important;
+}
+/* the player is a flex item that sizes itself from the video; with a video of 0 width it was 0 wide too (black screen) */
+html[data-page-type='video'][it-player-size='fit_to_window'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy[theater]:not([fullscreen]) #movie_player {
+	width: 100% !important;
+	/* the height too: before the video has started the player had only YouTube's own theater height (shorter than the
+	   window) and grew when the first picture arrived */
+	height: var(--height, 100%) !important;
+}
+/* player_size = "fit_to_window"  [extension/www.youtube.com/appearance/player/player.css] */
+html[data-page-type='video'][it-player-size='fit_to_window'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy[theater]:not([fullscreen]) video {
+	position: static !important;
+
+	max-height: none !important;
+	max-width: 100% !important;
+	height: var(--height, 64vh) !important;
+	/* full width, picture fitted inside by object-fit: the width no longer depends on the ratio YouTube writes to the page
+	   (a ratio of 0 or a stale one gave a video 0 px wide: sound but a black screen, or a player too small) */
+	width: 100% !important;
+	object-fit: contain !important;
+}
+/* player_size = "fit_to_window"  [extension/www.youtube.com/appearance/player/player.css] */
+html[data-page-type='video'][it-player-size='fit_to_window'] ytd-app:not([player-fullscreen_]) #container {
+	--height: calc(var(--it-player-size, 100vh) - var(--it-header-size, 0px));
+	/* YouTube sets the ratios a moment after the page loads; without a fallback the whole size was invalid in that
+	   moment and the video had no size (sound but a black screen) */
+	--ratio: calc(var(--ytd-watch-flexy-width-ratio, 16) / var(--ytd-watch-flexy-height-ratio, 9));
+	--width: calc(var(--height) * var(--ratio));
+}
+/* player_size = "fit_to_window"  [extension/www.youtube.com/appearance/player/player.css] */
+html[data-page-type='video'][it-player-size='fit_to_window'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy:not([theater]):not([fullscreen]) #player-container-inner {
+	padding-top: 0 !important;
+}
+/* player_size = "fit_to_window"  [extension/www.youtube.com/appearance/player/player.css] */
+html[data-page-type='video'][it-player-size='fit_to_window'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy:not([theater]):not([fullscreen]) #player-container {
+	position: static !important;
+}
+/* player_size = "fit_to_window"  [extension/www.youtube.com/appearance/player/player.css] */
+html[data-page-type='video'][it-player-size='fit_to_window'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy:not([theater]):not([fullscreen]) .html5-video-player {
+	width: auto;
+	display: table;
+	margin: auto
+}
+/* player_size = "fit_to_window"  [extension/www.youtube.com/appearance/player/player.css] */
+html[data-page-type='video'][it-player-size='fit_to_window'] ytd-app:not([player-fullscreen_]) ytd-watch-flexy:not([theater]):not([fullscreen]) video {
+	position: static !important;
+	width: 100% !important;
+	height: calc(var(--it-player-size, 100vh) - var(--it-header-size, 0px)) !important;
+	max-height: none !important;
+}
+
+
+/* player_transparent_background = true  [extension/www.youtube.com/appearance/player/player.css] */
+html[it-player-transparent-background='true'] #player-theater-container,
+html[it-player-transparent-background='true'] #theater-background,
+html[it-player-transparent-background='true'] #player-api,
+html[it-player-transparent-background='true'] .player-api,
+html[it-player-transparent-background='true'] #movie_player,
+html[it-player-transparent-background='true'] #player-container,
+html[it-player-transparent-background='true'] #movie_player video {
+	background-color: transparent !important;
+}
+
+/* popup_ad = true  [extension/www.youtube.com/appearance/details/details.css] */
+html[it-popup-ad='true'] ytd-guide-renderer #footer,
+html[it-popup-ad='true'] yt-mealbar-promo-renderer {display: none !important;
+}
+
+/* purchase = "hidden"  [extension/www.youtube.com/appearance/details/details.css] */
+html[it-purchase='hidden'] #purchase-button {display: none !important;
+}
+
+/* remove_home_page_shorts = true  [extension/www.youtube.com/general/general.css] */
+html[it-pathname='/'][it-remove-home-page-shorts="true"] ytd-rich-section-renderer:has(ytd-rich-grid-slim-media[is-short]),
+html[it-pathname='/'][it-remove-home-page-shorts="true"] ytd-rich-section-renderer:has(ytd-rich-shelf-renderer[is-shorts]) {
+	display: none !important;
+}
+
+/* remove_subscriptions_live_streams = true  [extension/www.youtube.com/general/general.css] */
+html[it-pathname='/feed/subscriptions'][it-remove-subscriptions-live-streams="true"] ytd-rich-item-renderer:has(ytd-thumbnail-overlay-time-status-renderer[overlay-style="LIVE"]),
+html[it-pathname='/feed/subscriptions'][it-remove-subscriptions-live-streams="true"] ytd-rich-item-renderer:has(ytd-thumbnail-overlay-time-status-renderer[overlay-style="UPCOMING"]),
+html[it-pathname='/feed/subscriptions'][it-remove-subscriptions-live-streams="true"] ytd-rich-item-renderer:has(.badge-style-type-live-now),
+html[it-pathname='/feed/subscriptions'][it-remove-subscriptions-live-streams="true"] ytd-rich-item-renderer:has(badge-shape.yt-badge-shape--live-now),
+html[it-pathname='/feed/subscriptions'][it-remove-subscriptions-live-streams="true"] ytd-rich-item-renderer:has(badge-shape.yt-badge-shape--upcoming-event),
+html[it-pathname='/feed/subscriptions'][it-remove-subscriptions-live-streams="true"] ytd-video-renderer:has(ytd-thumbnail-overlay-time-status-renderer[overlay-style="LIVE"]),
+html[it-pathname='/feed/subscriptions'][it-remove-subscriptions-live-streams="true"] ytd-video-renderer:has(ytd-thumbnail-overlay-time-status-renderer[overlay-style="UPCOMING"]),
+html[it-pathname='/feed/subscriptions'][it-remove-subscriptions-live-streams="true"] ytd-video-renderer:has(.badge-style-type-live-now),
+html[it-pathname='/feed/subscriptions'][it-remove-subscriptions-live-streams="true"] ytd-video-renderer:has(badge-shape.yt-badge-shape--live-now),
+html[it-pathname='/feed/subscriptions'][it-remove-subscriptions-live-streams="true"] ytd-video-renderer:has(badge-shape.yt-badge-shape--upcoming-event),
+html[it-pathname='/feed/subscriptions'][it-remove-subscriptions-live-streams="true"] yt-lockup-view-model:has(badge-shape.yt-badge-shape--live-now),
+html[it-pathname='/feed/subscriptions'][it-remove-subscriptions-live-streams="true"] yt-lockup-view-model:has(badge-shape.yt-badge-shape--upcoming-event) {
+	display: none !important;
+}
+
+/* remove_subscriptions_shorts = true  [extension/www.youtube.com/general/general.css] */
+html[it-pathname='/feed/subscriptions'][it-remove-subscriptions-shorts="true"] ytd-rich-section-renderer:has(ytd-rich-grid-slim-media[is-short]),
+html[it-pathname='/feed/subscriptions'][it-remove-subscriptions-shorts="true"] ytd-rich-section-renderer:has(ytd-rich-shelf-renderer[is-shorts]),
+html[it-pathname='/feed/subscriptions'][it-remove-subscriptions-shorts="true"] ytd-item-section-renderer:has(a[href="/feed/subscriptions/shorts"]) {
+	display: none !important;
+}
+
+/* remove_trending_shorts = true  [extension/www.youtube.com/general/general.css] */
+html[it-pathname='/feed/trending'][it-remove-trending-shorts="true"] ytd-reel-shelf-renderer,
+html[it-pathname='/feed/trending'][it-remove-trending-shorts="true"] ytd-video-renderer:has(ytd-thumbnail-overlay-time-status-renderer[overlay-style="SHORTS"]) {
+	display: none !important;
+}
+
+/* side_panels = "collapsed"  [extension/www.youtube.com/appearance/sidebar/sidebar.css] */
+html[it-side-panels='collapsed'] #secondary #panels > [it-panel-collapsed] > #header,
+html[it-side-panels='collapsed'] #secondary #panels > [it-panel-collapsed] > #header-container,
+html[it-side-panels='collapsed'] #secondary #panels > [it-panel-collapsed] > #title,
+html[it-side-panels='collapsed'] #playlist[it-panel-collapsed] > #header-container,
+html[it-side-panels='collapsed'] #playlist[it-panel-collapsed] > #title {
+	cursor: pointer !important;
+}
+/* side_panels = "collapsed"  [extension/www.youtube.com/appearance/sidebar/sidebar.css] */
+html[it-side-panels='collapsed'] #secondary #panels > [it-panel-collapsed] > #header,
+html[it-side-panels='collapsed'] #secondary #panels > [it-panel-collapsed] > #header-container,
+html[it-side-panels='collapsed'] #secondary #panels > [it-panel-collapsed] > #title,
+html[it-side-panels='collapsed'] #playlist[it-panel-collapsed] > #header-container,
+html[it-side-panels='collapsed'] #playlist[it-panel-collapsed] > #title {
+	background-color: var(--yt-spec-10-percent-layer, rgba(255,255,255,0.1)) !important;
+	border-radius: 8px !important;
+}
+/* side_panels = "collapsed"  [extension/www.youtube.com/appearance/sidebar/sidebar.css] */
+html[it-side-panels='collapsed'] #secondary #panels > [it-panel-collapsed] > #header::after,
+html[it-side-panels='collapsed'] #secondary #panels > [it-panel-collapsed] > #header-container::after,
+html[it-side-panels='collapsed'] #secondary #panels > [it-panel-collapsed] > #title::after,
+html[it-side-panels='collapsed'] #playlist[it-panel-collapsed] > #header-container::after,
+html[it-side-panels='collapsed'] #playlist[it-panel-collapsed] > #title::after {
+	content: 'Show' !important;
+	margin-left: auto !important;
+	padding-left: 8px !important;
+	color: var(--yt-spec-text-secondary, #aaa) !important;
+	font-size: 1.4rem !important;
+}
+
+/* squared_thumbnails = true  [extension/www.youtube.com/general/general.css] */
+html[it-squared-thumbnails='true'] ytd-thumbnail img,
+html[it-squared-thumbnails='true'] ytd-playlist-thumbnail #thumbnail,
+html[it-squared-thumbnails='true'] ytd-playlist-thumbnail img,
+html[it-squared-thumbnails='true'] .yt-thumbnail-view-model,
+html[it-squared-thumbnails='true'] .yt-thumbnail-view-model img,
+html[it-squared-thumbnails='true'] .yt-lockup-view-model-wiz__content-image img,
+html[it-squared-thumbnails='true'] .yt-video-card-view-model__thumbnail,
+html[it-squared-thumbnails='true'] .yt-video-card-view-model__thumbnail img {
+	border-radius: 0 !important;
+}
+/* squared_thumbnails = true  [extension/www.youtube.com/general/general.css] */
+html[it-squared-thumbnails='true'] ytd-thumbnail,
+html[it-squared-thumbnails='true'] ytd-thumbnail #thumbnail,
+html[it-squared-thumbnails='true'] ytd-thumbnail .yt-core-image,
+html[it-squared-thumbnails='true'] ytd-playlist-thumbnail,
+html[it-squared-thumbnails='true'] ytd-playlist-thumbnail #thumbnail,
+html[it-squared-thumbnails='true'] ytd-playlist-thumbnail .yt-core-image,
+html[it-squared-thumbnails='true'] yt-thumbnail-view-model,
+html[it-squared-thumbnails='true'] yt-thumbnail-view-model .yt-thumbnail-view-model__image,
+html[it-squared-thumbnails='true'] yt-thumbnail-view-model .yt-core-image,
+html[it-squared-thumbnails='true'] ytd-video-preview #media-container,
+html[it-squared-thumbnails='true'] .yt-lockup-view-model-wiz__content-image,
+html[it-squared-thumbnails='true'] .yt-lockup-view-model-wiz__content-image .yt-core-image,
+html[it-squared-thumbnails='true'] .shortsLockupViewModelHostThumbnailParentContainer {
+	--yt-img-border-radius: 0 !important;
+	--yt-thumbnail-border-radius: 0 !important;
+	border-radius: 0 !important;
+}
+
+/* subscribe = "hidden"  [extension/www.youtube.com/appearance/details/details.css] */
+html[it-subscribe='hidden'] #subscribe-button {display: none !important;
+}
+
+/* it-video-rescue: set by the page script when the video has no size although the player has one (sound but black) */
+html[it-video-rescue] ytd-watch-flexy:not([fullscreen]) video.html5-main-video {
+	position: static !important;
+	width: 100% !important;
+	height: 100% !important;
+	max-width: none !important;
+	max-height: none !important;
+	object-fit: contain !important;
+}
+
+/* AI Filter — styles injected into YouTube pages. */
+
+[data-aif='hide'] {
+  display: none !important;
+}
+
+[data-aif='blur'] {
+  position: relative !important;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.aif-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px;
+  text-align: center;
+  font-family: Roboto, Arial, sans-serif;
+  color: #fff;
+  background: rgba(15, 15, 15, 0.55);
+  -webkit-backdrop-filter: blur(22px) saturate(0.6);
+  backdrop-filter: blur(22px) saturate(0.6);
+  border-radius: 12px;
+  cursor: default;
+}
+
+.aif-overlay-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.aif-overlay-reason {
+  font-size: 12px;
+  opacity: 0.85;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.aif-overlay-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.aif-overlay button,
+#aif-page-bar button,
+#aif-home-bar button {
+  font:
+    500 12px/1 Roboto,
+    Arial,
+    sans-serif;
+  padding: 7px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.12);
+  color: inherit;
+  cursor: pointer;
+}
+
+.aif-overlay button:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+#aif-page-bar,
+#aif-home-bar {
+  --aif-fg: var(--yt-spec-text-primary, #0f0f0f);
+  --aif-bg: var(--yt-spec-badge-chip-background, rgba(0, 0, 0, 0.05));
+  --aif-accent: #6b7280;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 12px 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border-left: 4px solid var(--aif-accent);
+  background: var(--aif-bg);
+  color: var(--aif-fg);
+  font:
+    400 13px/1.4 Roboto,
+    Arial,
+    sans-serif;
+}
+
+#aif-page-bar.aif-tone-warn {
+  --aif-accent: #f59e0b;
+}
+#aif-page-bar.aif-tone-blocked {
+  --aif-accent: #ef4444;
+}
+#aif-page-bar.aif-tone-allowed {
+  --aif-accent: #10b981;
+}
+
+.aif-bar-badge {
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--aif-accent);
+}
+
+.aif-bar-message {
+  flex: 1 1 240px;
+}
+
+.aif-bar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+#aif-page-bar button,
+#aif-home-bar button {
+  border-color: var(--yt-spec-10-percent-layer, rgba(0, 0, 0, 0.15));
+  background: transparent;
+}
+
+#aif-page-bar button:hover,
+#aif-home-bar button:hover {
+  background: var(--yt-spec-10-percent-layer, rgba(0, 0, 0, 0.08));
+}
+
+#aif-page-bar button.aif-primary {
+  background: var(--aif-accent);
+  border-color: var(--aif-accent);
+  color: #fff;
+}
+
+/* Compact bar inline with Subscribe / Join in the channel header */
+#aif-page-bar.aif-inline {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  vertical-align: middle;
+  margin: 0 0 0 8px;
+  padding: 0 4px 0 12px;
+  height: 36px;
+  border-left: none;
+  border-radius: 18px;
+  box-shadow: inset 3px 0 0 var(--aif-accent);
+  gap: 8px;
+}
+#aif-page-bar.aif-inline .aif-bar-message {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+#aif-page-bar.aif-inline button {
+  height: 28px;
+  border-radius: 14px;
+  white-space: nowrap;
+}
+
+/* Home page strip (between the topic chips and the videos) */
+#aif-home-bar {
+  margin: 4px 0 12px;
+  padding: 6px 6px 6px 14px;
+  border-left: none;
+  border-radius: 18px;
+  box-shadow: inset 3px 0 0 #ef4444;
+}
+#aif-home-bar.aif-paused {
+  box-shadow: inset 3px 0 0 #6b7280;
+}
+#aif-home-bar .aif-bar-badge {
+  color: #ef4444;
+}
+#aif-home-bar.aif-paused .aif-bar-badge {
+  color: #6b7280;
+}
+#aif-home-bar .aif-bar-message {
+  flex: 1 1 auto;
+}
+#aif-home-bar button {
+  height: 28px;
+  border-radius: 14px;
+  white-space: nowrap;
+}
+#aif-home-bar .aif-seg {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  border-radius: 16px;
+  background: var(--yt-spec-10-percent-layer, rgba(0, 0, 0, 0.08));
+}
+#aif-home-bar .aif-seg button {
+  height: 24px;
+  border: none;
+  background: transparent;
+}
+#aif-home-bar .aif-seg button.aif-on {
+  background: var(--yt-spec-base-background, #fff);
+  color: var(--yt-spec-text-primary, #0f0f0f);
+}
+#aif-home-bar button.aif-primary {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #fff;
+}
+
+#aif-page-bar button.aif-confirm {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #fff;
+}
+
+/* "Block channel" button shown when hovering a video: a small icon in the channel-name line */
+.aif-hoverblock {
+  position: absolute; /* never part of the layout, so showing it can't move or resize anything */
+  visibility: hidden;
+  pointer-events: none;
+  vertical-align: middle;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border: 0;
+  border-radius: 10px;
+  font: 500 14px/20px Roboto, Arial, sans-serif;
+  white-space: nowrap;
+  color: #fff;
+  background: rgba(15, 15, 15, 0.85);
+  cursor: pointer;
+}
+[data-aif-hb]:hover .aif-hoverblock, .aif-hoverblock.aif-confirm { visibility: visible; pointer-events: auto; }
+.aif-hoverblock-inline { right: 0; top: 50%; transform: translateY(-50%); z-index: 5; }
+.aif-hoverblock:hover, .aif-hoverblock.aif-confirm { background: #c00; }
+.aif-hoverblock-corner { position: absolute; bottom: 8px; right: 8px; z-index: 60; margin: 0; padding: 5px 10px; font-size: 12px; }
+.aif-overlay .aif-overlay-block.aif-confirm { background: #c00; }
+[data-aif-hb-host] { position: relative; overflow: visible; }
+.aif-hoverblock-badge { position: absolute; right: -8px; bottom: -8px; z-index: 5; margin: 0; min-width: 24px; height: 24px; padding: 0 6px; line-height: 24px; font-size: 15px; border-radius: 12px; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25); }
+.aif-hoverblock-badge.aif-confirm { font-size: 12px; font-weight: 500; }
+
+/* Block channel button: first click shows the two choices (Block / Block as AI) */
+.aif-hoverblock .aif-l2, .aif-hoverblock .aif-l3, .aif-overlay-block .aif-l2, .aif-overlay-block .aif-l3 { display: none; }
+.aif-confirm .aif-l1 { display: none; }
+.aif-confirm .aif-l2, .aif-confirm .aif-l3 { display: inline-block; padding: 0 6px; cursor: pointer; }
+.aif-confirm .aif-l2 { border-left: 1px solid rgba(255,255,255,.55); }
+.aif-confirm .aif-l2:hover, .aif-confirm .aif-l3:hover { text-decoration: underline; }
+
+/* "Possibly AI": a small badge in the channel-name line, with two small choices */
+.aif-possible { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 0 6px; border-radius: 9px; font-size: 11px; line-height: 17px; font-weight: 500; background: rgba(255, 170, 0, 0.18); color: #ffb300; white-space: nowrap; vertical-align: middle; }
+.aif-possible button { all: unset; cursor: pointer; padding: 0 5px; border-radius: 8px; font-size: 10px; line-height: 15px; background: rgba(255, 255, 255, 0.14); color: inherit; }
+.aif-possible button:hover { background: #c00; color: #fff; }
+
+/* Undo box after a block / allow you made by hand */
+.aif-undo { position: fixed; left: 20px; bottom: 20px; z-index: 2147483000; display: flex; align-items: center; gap: 12px; max-width: min(420px, calc(100vw - 40px)); padding: 10px 14px; border-radius: 10px; background: #1f1f1f; color: #fff; font: 13px/1.3 Roboto, Arial, sans-serif; box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45); }
+.aif-undo span { overflow-wrap: anywhere; }
+.aif-undo .aif-undo-btn { all: unset; cursor: pointer; flex: none; padding: 4px 10px; border-radius: 14px; font-weight: 600; color: #3ea6ff; }
+.aif-undo .aif-undo-btn:hover { background: rgba(62, 166, 255, 0.18); }
+
+/* Sponsor Skip (ImprovedTube personal build) */
+.sps-markers {
+  /* its own layer over the progress bar: position/size set from the bar by content.js */
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  /* the very top of the stack: YouTube's own progress-bar layers can have very high z-index values (a mock with a
+     z-index 999 dark layer inside the bar reproduced the near-black self-promotion mark exactly) */
+  z-index: 2147483646 !important; /* above every other layer in the bar, but just under the play head below */
+  isolation: isolate;
+}
+.sps-markers,
+.sps-marker {
+  /* nothing from YouTube's styling may dim or blend the marks */
+  opacity: 1 !important;
+  filter: none !important;
+  mix-blend-mode: normal !important;
+  transform: none !important;
+}
+.sps-markers-svg {
+  /* the marks are SVG shapes, which automatic dark mode for websites leaves in their real colours */
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.sps-skip-button,
+.sps-notice {
+  position: absolute;
+  bottom: 72px;
+  z-index: 70;
+  font: 500 14px/1 Roboto, Arial, sans-serif;
+  color: #fff;
+}
+.sps-skip-button {
+  right: 16px;
+  padding: 10px 16px;
+  border: none;
+  border-left: 4px solid var(--sps-color, #fff);
+  border-radius: 6px;
+  background: rgba(15, 15, 15, 0.85);
+  cursor: pointer;
+}
+.sps-poi-button {
+  transition: opacity 0.25s;
+}
+/* The Highlight button follows the player controls: when YouTube hides them (the player gets .ytp-autohide), it fades out too */
+.ytp-autohide .sps-poi-button {
+  opacity: 0;
+  pointer-events: none;
+}
+.sps-skip-button:hover {
+  background: rgba(40, 40, 40, 0.95);
+}
+.sps-notice {
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 8px 8px 14px;
+  border-radius: 6px;
+  background: rgba(15, 15, 15, 0.85);
+}
+.sps-notice-undo {
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 14px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+.sps-notice-undo:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* the play head (the round dot on the progress bar) is drawn on top of the marks */
+.ytp-progress-bar .ytp-scrubber-container { z-index: 2147483647 !important; }

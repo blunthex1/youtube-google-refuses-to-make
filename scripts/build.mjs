@@ -60,6 +60,7 @@ async function buildApp() {
   await Promise.all([
     cp(r('core', 'options', 'options.html'), path.join(out, 'settings.html')),
     cp(r('core', 'options', 'options.css'), path.join(out, 'options.css')),
+    cp(r('focus', 'options'), path.join(out, 'focus-options'), { recursive: true }),
   ]);
   return [
     {
@@ -69,10 +70,11 @@ async function buildApp() {
       external: ['electron'],
       format: 'cjs',
       outExtension: { '.js': '.cjs' },
-      loader: { '.css': 'text' },
+      loader: { '.css': 'text', '.txt': 'text' },
       entryPoints: {
         'preload-youtube': r('app', 'src', 'preload-youtube.js'),
         'preload-settings': r('app', 'src', 'preload-settings.js'),
+        'preload-focus-settings': r('app', 'src', 'preload-focus-settings.js'),
       },
       outdir: out,
     },
