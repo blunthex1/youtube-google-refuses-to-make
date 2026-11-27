@@ -4,3 +4,5 @@ app/dist/
 release/
 *.log
 .DS_Store
+native-shell/**/bin/
+native-shell/**/obj/
